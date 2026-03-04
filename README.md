@@ -259,6 +259,24 @@ See NOTICE file for full attribution details.
 
 ---
 
+## References / Inspiration
+
+### Ubuntu Touch GSI Experimental Ideas
+
+The concept of combining a Generic System Image with an Ubuntu-based rootfs to run Ubuntu on Treble-compliant Android devices was explored in an experimental project on the XDA Developers forum:
+
+**[GSI [arm64][A/AB] Ubuntu Touch (ubports)](https://xdaforums.com/t/gsi-arm64-a-ab-ubuntu-touch-ubports.4110581/)**
+
+Key ideas from that community discussion:
+
+- **GSI + Ubuntu Touch rootfs**: The project demonstrated that a generic system image paired with an Ubuntu Touch rootfs could boot Ubuntu Touch via the Treble GSI mechanism, using the Halium compatibility layer for hardware access.
+- **Vendor base requirements**: Successful boot required an Android 9 (Pie) vendor base and a Halium-patched kernel to provide the necessary hardware abstraction layer interfaces.
+- **Feasibility proof**: While the project was experimental and appears to be no longer actively developed, it demonstrated that the fundamental approach of running a full Linux distribution on top of a Treble-compliant GSI is feasible.
+
+This project idea was partially inspired by community exploration and experimentation from the XDA Developers forum linked above. Our approach differs in several ways — notably the use of LXC containers for isolation, AIDL-only binder IPC (no HIDL/Halium), multi-layer security hardening, and targeting modern Android 16 vendor images — but the core concept of a GSI-based Ubuntu system owes credit to that earlier community work.
+
+---
+
 ## Updating Ubuntu
 
 Ubuntu packages are updatable via `apt` without reflashing:
