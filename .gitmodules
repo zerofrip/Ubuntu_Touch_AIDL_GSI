@@ -1,6 +1,22 @@
 [submodule "third_party/lxc"]
 	path = third_party/lxc
 	url = https://github.com/lxc/lxc.git
+
 [submodule "third_party/libseccomp"]
 	path = third_party/libseccomp
 	url = https://github.com/seccomp/libseccomp.git
+
+[submodule "third_party/aosp_frameworks_native"]
+	path = third_party/aosp_frameworks_native
+	url = https://android.googlesource.com/platform/frameworks/native
+	branch = android-16.0.0_r1
+
+[submodule "third_party/aosp_system_core"]
+	path = third_party/aosp_system_core
+	url = https://android.googlesource.com/platform/system/core
+	branch = android-16.0.0_r1
+
+[submodule "third_party/aosp_system_sepolicy"]
+	path = third_party/aosp_system_sepolicy
+	url = https://android.googlesource.com/platform/system/sepolicy
+	branch = android-16.0.0_r1
