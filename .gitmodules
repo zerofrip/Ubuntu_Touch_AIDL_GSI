@@ -1,0 +1,6 @@
+[submodule "third_party/lxc"]
+	path = third_party/lxc
+	url = https://github.com/lxc/lxc.git
+[submodule "third_party/libseccomp"]
+	path = third_party/libseccomp
+	url = https://github.com/seccomp/libseccomp.git
