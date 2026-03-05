@@ -26,7 +26,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SYSTEM_DIR="${SCRIPT_DIR}/system"
 OUTPUT_IMAGE="${1:-${SCRIPT_DIR}/ubuntu-gsi-arm64.img}"
 TEMP_DIR="$(mktemp -d)"
-IMAGE_SIZE="4096M"  # 4G image for Ubuntu Touch GUI
+IMAGE_SIZE="128M"  # Minimal — no Android framework
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -55,22 +55,6 @@ REQUIRED_FILES=(
     "${SYSTEM_DIR}/etc/seccomp/ubuntu_container.json"
     "${SYSTEM_DIR}/build.prop"
 )
-
-# ---- Generate Rootfs ----
-if [ ! -d "${SYSTEM_DIR}/ubuntu-rootfs/bin" ]; then
-    log_info "Ubuntu rootfs not found. Generating via generate-rootfs.sh..."
-    if [ -x "${SCRIPT_DIR}/generate-rootfs.sh" ]; then
-        sudo "${SCRIPT_DIR}/generate-rootfs.sh" "${SYSTEM_DIR}/ubuntu-rootfs" || {
-            log_error "Rootfs generation failed!"
-            exit 1
-        }
-    else
-        log_error "generate-rootfs.sh not found or not executable. Try: chmod +x generate-rootfs.sh"
-        exit 1
-    fi
-else
-    log_info "Ubuntu rootfs found in ${SYSTEM_DIR}/ubuntu-rootfs."
-fi
 
 for f in "${REQUIRED_FILES[@]}"; do
     if [ ! -f "$f" ]; then
