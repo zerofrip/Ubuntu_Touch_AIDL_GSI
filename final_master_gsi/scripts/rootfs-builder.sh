@@ -44,6 +44,6 @@ cp -r "$WORKSPACE_DIR/scripts" "$ROOTFS_BASE/"
 cp -r "$WORKSPACE_DIR/waydroid/" "$ROOTFS_BASE/waydroid/"
 
 echo "[$(date -Iseconds)] [RootFS Compiler] Compiling strict SquashFS Differential Limits..."
-mksquashfs "$ROOTFS_BASE" "$OUTPUT_SQUASHFS" -comp xz -b 1048576 -Xdict-size 100% -always-use-fragments
+mksquashfs "$ROOTFS_BASE" "$OUTPUT_SQUASHFS" -comp xz -b 1048576 -Xdict-size 100% -always-use-fragments -e var/lib/snapd/void
 
 echo "[$(date -Iseconds)] [RootFS Compiler] SUCCESS: Generated pure differential OS target at $OUTPUT_SQUASHFS"
