@@ -1,6 +1,6 @@
 [Unit]
 Description=Ubuntu GSI Binder Bridge — AIDL HAL Orchestrator
-Documentation=https://github.com/zerofrip/Ubuntu_GSI
+Documentation=https://github.com/zerofrip/Ubuntu_Touch_GSI
 After=local-fs.target
 Wants=local-fs.target
 ConditionPathExists=/dev/binder
