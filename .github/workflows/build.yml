@@ -1,0 +1,70 @@
+name: Ubuntu GSI Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: ShellCheck Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Install ShellCheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Lint all shell scripts
+        run: |
+          find . -name '*.sh' \
+            -not -path './third_party/*' \
+            -not -path './builder/out/*' \
+            -print0 | xargs -0 shellcheck --severity=error || true
+
+  build:
+    name: Build GSI (Dry-Run)
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y squashfs-tools e2fsprogs jq
+
+      - name: Run environment check
+        run: bash scripts/check_environment.sh
+
+      - name: Prepare dummy rootfs for CI
+        run: |
+          mkdir -p builder/out/ubuntu-rootfs
+          # Create minimal directory structure for dry-run
+          mkdir -p builder/out/ubuntu-rootfs/{bin,sbin,usr,lib,etc,var,tmp}
+          echo "CI dry-run rootfs" > builder/out/ubuntu-rootfs/etc/ci-marker
+
+      - name: Run build
+        run: bash build.sh
+
+      - name: Verify build artifacts
+        run: |
+          echo "=== Build artifacts ==="
+          ls -lh builder/out/system.img || echo "system.img missing"
+          ls -lh builder/out/linux_rootfs.squashfs || echo "linux_rootfs.squashfs missing"
+
+      - name: Upload artifacts
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: ubuntu-gsi-${{ github.ref_name }}
+          path: |
+            builder/out/system.img
+            builder/out/linux_rootfs.squashfs
+          retention-days: 30

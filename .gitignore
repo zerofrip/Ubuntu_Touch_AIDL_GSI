@@ -22,3 +22,8 @@ ubuntu-gsi-arm64.img
 Thumbs.db
 ubuntu-touch-rootfs.tar.gz
 builder/out/
+
+# Logs and QA reports
+*.log
+MASTER_QA_REPORT.*
+

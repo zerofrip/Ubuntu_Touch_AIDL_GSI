@@ -8,7 +8,8 @@
 
 set -e
 
-WORKSPACE_DIR="/home/zerof/github/Ubuntu_GSI/builder"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKSPACE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 OUTPUT_SQUASHFS="$WORKSPACE_DIR/out/linux_rootfs.squashfs"
 ROOTFS_BASE="$WORKSPACE_DIR/out/ubuntu-rootfs"
 

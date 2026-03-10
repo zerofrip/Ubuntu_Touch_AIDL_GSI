@@ -1,6 +1,26 @@
 # Ubuntu Touch GSI Final Master Framework
 
+[![Build](https://github.com/zerofrip/Ubuntu_GSI/actions/workflows/build.yml/badge.svg)](https://github.com/zerofrip/Ubuntu_GSI/actions/workflows/build.yml)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+
 This repository provides the ultimate, production-grade logic for deploying **Ubuntu Touch (Linux) GSI** implementations on **Android 15-18+** devices. It integrates advanced GPU abstraction, HAL dynamic detection, multi-generation snapshot management, and isolated LXC sandboxing.
+
+## ⚡ Quick Start
+
+```bash
+# Clone with submodules
+git clone --recursive https://github.com/zerofrip/Ubuntu_GSI.git
+cd Ubuntu_GSI
+
+# Check build environment
+make check
+
+# Build (downloads rootfs automatically if missing)
+make build
+
+# Flash to device (interactive)
+make install
+```
 
 ## 🚀 Key Features
 
@@ -10,61 +30,102 @@ This repository provides the ultimate, production-grade logic for deploying **Ub
 - **LXC Sandbox Isolation:** Dynamic NAT assignment (10.x.3.1), strict BinderFS write-locks, and Seccomp V2 filtering for Waydroid.
 - **OTA Multi-Stage Safety:** Fingerprint-based cache flushing to ensure stability across Android vendor updates.
 - **Automated QA Reporting:** Comprehensive HTML, JSON, and CSV diagnostic reports tracking total subsystem health.
+- **CI/CD Pipeline:** GitHub Actions workflow with ShellCheck linting and automated builds.
 
 ## 📂 Repository Structure
 
-### 🛠️ Core Orchestration
-- **`build.sh`**: The master build orchestrator. Sequences `rootfs-builder.sh` and `gsi-pack.sh`.
-- **`scripts/rootfs-builder.sh`**: Compiles the Ubuntu rootfs into a compressed SquashFS block.
-- **`scripts/gsi-pack.sh`**: Generates the final sparse `system.img` for Fastboot flashing.
-- **`scripts/detect-gpu.sh`**: GPU capability discovery and OTA-safe caching.
-- **`scripts/detect-vendor-services.sh`**: Scans Android vendor HALs and generates fingerprint hashes.
+### 🛠️ Host-Side Tooling (`scripts/`)
+- **`scripts/check_environment.sh`**: Validates build dependencies, disk space, and submodule status.
+- **`scripts/install.sh`**: Interactive device flash helper (fastboot + ADB automation).
 
-### 🧩 Subsystems
-- **`/init/`**:
+### 🛠️ Core Build Pipeline
+- **`build.sh`**: The master build orchestrator. Sources `config.env`, runs environment check, then sequences rootfs extraction → SquashFS compilation → system.img packaging.
+- **`config.env`**: Configurable build parameters (rootfs URL, compression, image size, architecture).
+- **`Makefile`**: Convenience targets — `make build`, `make check`, `make clean`, `make install`, `make lint`.
+
+### 🛠️ Builder Components (`builder/`)
+- **`builder/scripts/rootfs-builder.sh`**: Compiles the Ubuntu rootfs into a compressed SquashFS block.
+- **`builder/scripts/gsi-pack.sh`**: Generates the final `system.img` for Fastboot flashing.
+- **`builder/scripts/detect-gpu.sh`**: GPU capability discovery and OTA-safe caching.
+- **`builder/scripts/detect-vendor-services.sh`**: Scans Android vendor HALs and generates fingerprint hashes.
+
+### 🧩 Subsystems (`builder/`)
+- **`builder/init/`**:
     - `mount.sh`: Manages OverlayFS pivot_root, snapshot rotation, and fallback recovery.
-- **`/system/gpu-wrapper/`**:
+- **`builder/system/gpu-wrapper/`**:
     - `gpu-bridge.sh`: Manages compositor lifecycle, hardware acceleration, and the LLVMpipe watchdog.
-- **`/system/uhl/`**:
+- **`builder/system/uhl/`**:
     - `uhl_manager.sh`: Dynamically boots services based on `module_manifest.json`.
     - `module_manifest.json`: Configuration manifest for UHL daemons.
-- **`/system/haf/`**:
+- **`builder/system/haf/`**:
     - `common_hal.sh`: Shared library for HAL mocking and retry logic.
     - `*_daemon.sh`: Modular services for Audio, Camera, Power, Sensors, and Input.
-- **`/waydroid/`**:
+- **`builder/waydroid/`**:
     - `setup_container.sh`: Provisions dynamic LXC networking and IPC sandboxing.
     - `lxc-seccomp.conf`: Seccomp V2 policy for container confinement.
 
-### 🧪 QA & Diagnostics
-- **`scripts/test-gpu-fallback.sh`**: Simulates GPU compositor crashes.
-- **`scripts/test-hal-mocks.sh`**: Validates Selective HAL mocking logic.
-- **`scripts/test-rollback.sh`**: Tests OverlayFS snapshot recovery.
-- **`scripts/test-waydroid-isolation.sh`**: Verifies LXC network and IPC boundaries.
-- **`scripts/aggregate-logs.sh`**: Compiles all telemetry into `MASTER_QA_REPORT` (HTML/JSON/CSV).
+### 🧪 QA & Diagnostics (`builder/scripts/`)
+- **`test-gpu-fallback.sh`**: Simulates GPU compositor crashes.
+- **`test-hal-mocks.sh`**: Validates Selective HAL mocking logic.
+- **`test-rollback.sh`**: Tests OverlayFS snapshot recovery.
+- **`test-waydroid-isolation.sh`**: Verifies LXC network and IPC boundaries.
+- **`aggregate-logs.sh`**: Compiles all telemetry into `MASTER_QA_REPORT` (HTML/JSON/CSV).
 
 ## 🛠️ Build & Installation
 
-1. **Prepare Environment:**
-   Ensure you have `mksquashfs`, `e2fsprogs` (for `mkfs.ext4`), and `jq` installed.
-   Place your Ubuntu Touch rootfs tarball named `ubuntu-touch-rootfs.tar.gz` in the repository root.
-   ```bash
-   # Alternatively, prepare the directory manually
-   mkdir -p out/ubuntu-rootfs
-   ```
+### Prerequisites
 
-2. **Execute Master Build:**
-   ```bash
-   ./build.sh
-   ```
+| Tool | Package | Required |
+|------|---------|----------|
+| `mksquashfs` | `squashfs-tools` | ✅ |
+| `mkfs.ext4` | `e2fsprogs` | ✅ |
+| `jq` | `jq` | ✅ |
+| `wget` or `curl` | `wget` / `curl` | ✅ |
+| `adb` | `android-tools-adb` | For flashing |
+| `fastboot` | `android-tools-fastboot` | For flashing |
+| `shellcheck` | `shellcheck` | For linting |
 
-3. **Deploy to Device:**
-   ```bash
-   # Flash the system image
-   fastboot flash system out/system.img
-   
-   # Push the rootfs block to userdata
-   adb push out/linux_rootfs.squashfs /data/
-   ```
+```bash
+# Install all build dependencies (Ubuntu/Debian)
+sudo apt install squashfs-tools e2fsprogs jq wget shellcheck
+```
+
+### Build
+
+```bash
+# Option A: Using Make (recommended)
+make build
+
+# Option B: Direct execution
+./build.sh
+```
+
+### Configuration
+
+Edit `config.env` to customize build parameters without modifying scripts:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ROOTFS_URL` | UBports Focal arm64 | Download URL for Ubuntu rootfs |
+| `SQUASHFS_COMP` | `xz` | Compression: `xz`, `gzip`, `lzo`, `lz4`, `zstd` |
+| `SYSTEM_IMG_SIZE_MB` | `512` | system.img size in MB |
+| `ARCH` | `arm64` | Target architecture |
+
+```bash
+# Example: build with faster (but larger) compression
+SQUASHFS_COMP=lz4 make build
+```
+
+### Deploy to Device
+
+```bash
+# Interactive installer (recommended)
+make install
+
+# Manual deployment
+fastboot flash system builder/out/system.img
+adb push builder/out/linux_rootfs.squashfs /data/
+```
 
 ## 📈 QA & Debugging
 
@@ -87,6 +148,17 @@ touch /data/uhl_overlay/rollback
 ```
 Snapshots are automatically purged after 3 generations to prevent storage bloat.
 
+## 🔧 Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| `mksquashfs: command not found` | `sudo apt install squashfs-tools` |
+| `mkfs.ext4: command not found` | `sudo apt install e2fsprogs` |
+| Build fails with permission error | Run `chmod +x build.sh scripts/*.sh` |
+| Device not detected by `make install` | Enable USB debugging, check `adb devices` |
+| System doesn't boot after flash | `adb shell touch /data/uhl_overlay/rollback && adb reboot` |
+| GPU fails, black screen | System auto-falls back to LLVMpipe after 5s; check `gpu_stage.log` |
+| HAL daemons won't start | Check `daemon.log` and verify `module_manifest.json` entries |
 
 ## Security Model
 
@@ -122,7 +194,7 @@ See [threat_model.md](docs/threat_model.md) for detailed attack scenario analysi
 This project depends on the following upstream components, integrated as git submodules under `third_party/`:
 
 | Component | Repository | Version | License | Copyright |
-|-----------|-----------|---------|---------|-----------|
+|-----------|-----------|---------|---------|-----------| 
 | **AOSP frameworks/native** | [googlesource.com](https://android.googlesource.com/platform/frameworks/native) | `android-16.0.0_r1` | Apache 2.0 | The Android Open Source Project |
 | **AOSP system/core** | [googlesource.com](https://android.googlesource.com/platform/system/core) | `android-16.0.0_r1` | Apache 2.0 | The Android Open Source Project |
 | **AOSP system/sepolicy** | [googlesource.com](https://android.googlesource.com/platform/system/sepolicy) | `android-16.0.0_r1` | Apache 2.0 | The Android Open Source Project |
@@ -214,6 +286,7 @@ See NOTICE file for full attribution details.
 | [threat_model.md](docs/threat_model.md) | Attack surfaces, mitigations, risk matrix |
 | [selinux_policy.md](docs/selinux_policy.md) | SELinux rule reference with rationale |
 | [system_layout.md](docs/system_layout.md) | Complete directory tree documentation |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Developer setup, conventions, and PR workflow |
 
 ---
 
