@@ -16,6 +16,7 @@ touch "$LOG_FILE" "$STATS_FILE"
 echo "[$(date -Iseconds)] [Master GPU Matrix] Evaluating Hardware State..." >> "$LOG_FILE"
 
 STATE_FILE="/tmp/gpu_state"
+# shellcheck source=/dev/null
 source "$STATE_FILE" 2>/dev/null || MODE="UNKNOWN"
 
 export LD_LIBRARY_PATH="/system/lib64:/vendor/lib64"

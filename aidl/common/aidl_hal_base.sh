@@ -16,7 +16,6 @@
 AIDL_LOG_DIR="/data/uhl_overlay"
 AIDL_STATE_DIR="/run/ubuntu-gsi/hal"
 BINDER_DEV="/dev/binder"
-VNDBINDER_DEV="/dev/vndbinder"
 VINTF_MANIFEST="/vendor/etc/vintf/manifest.xml"
 
 # ---------------------------------------------------------------------------

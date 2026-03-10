@@ -13,7 +13,6 @@ source "$SCRIPT_DIR/../common/aidl_hal_base.sh"
 aidl_hal_init "graphics" "android.hardware.graphics.composer3.IComposer" "critical"
 
 GPU_CACHE="/data/uhl_overlay/gpu_success.cache"
-GPU_LOG="/data/uhl_overlay/gpu_stage.log"
 
 # ---------------------------------------------------------------------------
 # GPU Detection
@@ -21,6 +20,7 @@ GPU_LOG="/data/uhl_overlay/gpu_stage.log"
 detect_gpu_mode() {
     # Check cached result first
     if [ -f "$GPU_CACHE" ]; then
+        # shellcheck source=/dev/null
         source "$GPU_CACHE"
         hal_info "GPU cache hit: MODE=$MODE"
         return
