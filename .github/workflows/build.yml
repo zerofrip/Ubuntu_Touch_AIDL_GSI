@@ -6,6 +6,12 @@ on:
     tags: ['v*']
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v1.0.0) — leave empty to skip release creation'
+        required: false
+        default: ''
 
 jobs:
   lint:
@@ -81,10 +87,11 @@ jobs:
           if-no-files-found: error
 
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
         uses: softprops/action-gh-release@v2
         with:
-          name: Ubuntu GSI ${{ github.ref_name }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.tag }}
+          name: Ubuntu GSI ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.tag }}
           body: |
             ## Ubuntu GSI ${{ github.ref_name }}
 
@@ -106,7 +113,7 @@ jobs:
             builder/out/linux_rootfs.squashfs
             builder/out/userdata.img
           draft: false
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          prerelease: ${{ contains(startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.tag, '-') }}
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
