@@ -9,10 +9,13 @@ Before=binder-bridge.service lomiri.service
 Type=oneshot
 ExecStart=/usr/lib/ubuntu-gsi/firstboot.sh
 RemainAfterExit=yes
-TimeoutStartSec=120
+TimeoutStartSec=0
 
-StandardOutput=journal
+StandardInput=tty
+StandardOutput=tty
 StandardError=journal
+TTYPath=/dev/console
+TTYReset=yes
 SyslogIdentifier=ubuntu-gsi-firstboot
 
 [Install]

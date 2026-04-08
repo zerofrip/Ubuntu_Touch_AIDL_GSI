@@ -41,6 +41,7 @@ curl
 nano
 less
 htop
+e2fsprogs
 
 # Display (Mir + Wayland)
 mir-graphics-drivers-desktop

@@ -35,7 +35,16 @@ if [ -f "$CONFIG_FILE" ]; then
     # shellcheck source=../../config.env
     source "$CONFIG_FILE"
 fi
-SYSTEM_IMG_SIZE_MB="${SYSTEM_IMG_SIZE_MB:-512}"
+SYSTEM_IMG_SIZE_MB="${SYSTEM_IMG_SIZE_MB:-0}"
+
+# Auto-compute minimal size when SYSTEM_IMG_SIZE_MB=0
+if [ "${SYSTEM_IMG_SIZE_MB}" -eq 0 ]; then
+    CONTENT_MB=$(du -sm "$BOOTSTRAP_DIR" | cut -f1)
+    SYSTEM_IMG_SIZE_MB=$(( CONTENT_MB + 8 ))
+    # Minimum 16 MB (ext4 lower bound)
+    [ "$SYSTEM_IMG_SIZE_MB" -lt 16 ] && SYSTEM_IMG_SIZE_MB=16
+    echo "[$(date -Iseconds)] [GSI Packager] Auto system.img size: ${SYSTEM_IMG_SIZE_MB}MB (content ${CONTENT_MB}MB + 8MB headroom)"
+fi
 
 dd if=/dev/zero of="$OUT_IMG" bs=1M count="$SYSTEM_IMG_SIZE_MB"
 

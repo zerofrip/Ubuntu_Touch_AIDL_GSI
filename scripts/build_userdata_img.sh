@@ -23,7 +23,7 @@ if [ -f "$CONFIG_FILE" ]; then
     source "$CONFIG_FILE"
 fi
 
-USERDATA_SIZE_MB="${USERDATA_IMG_SIZE_MB:-4096}"
+USERDATA_SIZE_MB="${USERDATA_IMG_SIZE_MB:-0}"
 SQUASHFS_FILE="$BUILD_DIR/linux_rootfs.squashfs"
 USERDATA_IMG="$BUILD_DIR/userdata.img"
 STAGING_DIR="$BUILD_DIR/userdata_staging"
@@ -51,6 +51,13 @@ if [ ! -f "$SQUASHFS_FILE" ]; then
 fi
 
 SQUASHFS_SIZE_MB=$(du -m "$SQUASHFS_FILE" | cut -f1)
+
+# Auto-compute minimal size when USERDATA_SIZE_MB=0
+if [ "${USERDATA_SIZE_MB}" -eq 0 ]; then
+    USERDATA_SIZE_MB=$(( SQUASHFS_SIZE_MB + 64 ))
+    info "Auto userdata size: ${USERDATA_SIZE_MB}MB (squashfs ${SQUASHFS_SIZE_MB}MB + 64MB headroom)"
+fi
+
 if [ "$USERDATA_SIZE_MB" -le "$SQUASHFS_SIZE_MB" ]; then
     error "FATAL: Userdata image size (${USERDATA_SIZE_MB}MB) must be larger than squashfs (${SQUASHFS_SIZE_MB}MB)"
     error "Increase USERDATA_IMG_SIZE_MB in config.env"

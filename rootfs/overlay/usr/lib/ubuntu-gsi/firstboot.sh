@@ -25,6 +25,93 @@ log "  Ubuntu GSI — First Boot Initialization"
 log "═══════════════════════════════════════════════════"
 
 # ---------------------------------------------------------------------------
+# 0. Interactive userdata partition resize
+# ---------------------------------------------------------------------------
+log "Step 0: Userdata partition setup — interactive resize"
+
+# Locate the block device backing /data (most reliable: read from /proc/mounts)
+USERDATA_DEV=$(awk '$2 == "/data" { print $1 }' /proc/mounts 2>/dev/null | head -1)
+
+# Fallback: well-known Android by-name symlinks
+if [ -z "$USERDATA_DEV" ]; then
+    for _c in \
+        /dev/block/bootdevice/by-name/userdata \
+        /dev/block/by-name/userdata; do
+        if [ -b "$_c" ]; then
+            USERDATA_DEV="$_c"
+            break
+        fi
+    done
+fi
+
+if [ -n "$USERDATA_DEV" ]; then
+    TOTAL_BYTES=$(blockdev --getsize64 "$USERDATA_DEV" 2>/dev/null || echo 0)
+    TOTAL_MB=$(( TOTAL_BYTES / 1024 / 1024 ))
+    TOTAL_GB=$(awk "BEGIN { printf \"%.1f\", $TOTAL_BYTES / 1073741824 }")
+
+    echo ""
+    echo "═══════════════════════════════════════════════════════════"
+    echo "  Ubuntu GSI — System Partition Setup"
+    echo "═══════════════════════════════════════════════════════════"
+    echo ""
+    echo "  Device        : $USERDATA_DEV"
+    echo "  Total capacity: ${TOTAL_GB} GB  (${TOTAL_MB} MB)"
+    echo ""
+    echo "  Enter the size to allocate for the Ubuntu system partition."
+    echo ""
+    echo "  Formats:"
+    echo "    20G        — fixed size in GiB"
+    echo "    512M       — fixed size in MiB"
+    echo "    50%        — percentage of total capacity"
+    echo "    all        — use entire partition  (default)"
+    echo "    skip       — keep current minimal size"
+    echo ""
+    printf "  Size [all]: "
+    read -r PARTITION_INPUT
+
+    PARTITION_INPUT="${PARTITION_INPUT:-all}"
+    log "User input: '${PARTITION_INPUT}'"
+
+    case "$PARTITION_INPUT" in
+        skip)
+            log "Resize skipped by user"
+            ;;
+        all|"")
+            log "Expanding to full partition (resize2fs without size argument)..."
+            if resize2fs "$USERDATA_DEV" >>"$LOG" 2>&1; then
+                log "Userdata expanded to full partition successfully"
+            else
+                log "WARNING: resize2fs failed — continuing without resize"
+            fi
+            ;;
+        *%)
+            PCT="${PARTITION_INPUT%%%}"
+            if [ "$PCT" -gt 0 ] && [ "$PCT" -le 100 ] 2>/dev/null; then
+                DESIRED_MB=$(( TOTAL_MB * PCT / 100 ))
+                log "Expanding to ${PCT}% → ${DESIRED_MB} MB..."
+                if resize2fs "$USERDATA_DEV" "${DESIRED_MB}M" >>"$LOG" 2>&1; then
+                    log "Userdata expanded to ${DESIRED_MB} MB (${PCT}%) successfully"
+                else
+                    log "WARNING: resize2fs failed — continuing without resize"
+                fi
+            else
+                log "WARNING: Invalid percentage '${PARTITION_INPUT}' — skipping resize"
+            fi
+            ;;
+        *)
+            log "Expanding to ${PARTITION_INPUT}..."
+            if resize2fs "$USERDATA_DEV" "$PARTITION_INPUT" >>"$LOG" 2>&1; then
+                log "Userdata expanded to ${PARTITION_INPUT} successfully"
+            else
+                log "WARNING: resize2fs failed for size '${PARTITION_INPUT}' — continuing without resize"
+            fi
+            ;;
+    esac
+else
+    log "WARNING: Could not locate userdata block device — skipping resize"
+fi
+
+# ---------------------------------------------------------------------------
 # 1. Create default user
 # ---------------------------------------------------------------------------
 log "Creating default user: ubuntu"
