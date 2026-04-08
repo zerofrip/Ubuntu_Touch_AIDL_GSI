@@ -43,18 +43,18 @@ graph TD
 
 ```
 ┌─────────────────────────────┐
-│ boot    │ Kernel + ramdisk   │
+│ boot    │ Kernel + ramdisk  │
 ├─────────────────────────────┤
-│ system  │ Custom init +      │ ← system.img (fastboot flash)
-│         │ mount scripts      │
+│ system  │ Custom init +     │ ← system.img (fastboot flash)
+│         │ mount scripts     │
 ├─────────────────────────────┤
-│ vendor  │ OEM HAL binaries   │ ← Untouched (read-only)
+│ vendor  │ OEM HAL binaries  │ ← Untouched (read-only)
 ├─────────────────────────────┤
-│ userdata│ linux_rootfs.sqfs  │ ← userdata.img (fastboot flash)
-│         │ uhl_overlay/       │
-│         │   upper/           │
-│         │   work/            │
-│         │   snapshots/       │
+│ userdata│ linux_rootfs.sqfs │ ← userdata.img (fastboot flash)
+│         │ uhl_overlay/      │
+│         │   upper/          │
+│         │   work/           │
+│         │   snapshots/      │
 └─────────────────────────────┘
 ```
 
