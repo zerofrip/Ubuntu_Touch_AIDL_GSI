@@ -1,6 +1,9 @@
-# SELinux Policy Outline — Ubuntu GSI Container
+# SELinux Policy Outline — Ubuntu GSI
 
-This document provides a human-readable explanation of the SELinux CIL policy defined in [`ubuntu_gsi.cil`](file:///home/zerof/github/Ubuntu_GSI/system/etc/selinux/ubuntu_gsi.cil).
+This document describes the target SELinux CIL policy for the Ubuntu GSI.
+The policy file (`ubuntu_gsi.cil`) is currently in development.
+
+> **Note:** Ubuntu runs directly via `switch_root` (no LXC). The SELinux domains described here govern Ubuntu processes after the pivot.
 
 ---
 
@@ -9,15 +12,15 @@ This document provides a human-readable explanation of the SELinux CIL policy de
 ```mermaid
 graph TD
     subgraph Domains
-        INIT["init_t\n(Android init)"]
-        SM["servicemanager_t\n(Binder SM)"]
-        UCT["ubuntu_container_t\n(LXC processes)"]
+        INIT["init_t\n(Custom init PID 1)"]
+        SM["servicemanager_t\n(Binder SM, optional)"]
+        UCT["ubuntu_system_t\n(Ubuntu systemd + processes)"]
         BBT["ubuntu_binder_bridge_t\n(Binder bridge)"]
     end
 
     subgraph "File Types"
-        UCE["ubuntu_container_exec_t\n(LXC binaries)"]
-        UCD["ubuntu_container_data_t\n(/data/ubuntu)"]
+        UCE["ubuntu_exec_t\n(Ubuntu binaries)"]
+        UCD["ubuntu_data_t\n(/data/uhl_overlay)"]
         SF["system_file\n(/system)"]
         VF["vendor_file\n(/vendor) ✘"]
     end
@@ -49,10 +52,10 @@ graph TD
 
 | Type | Purpose | Assigned To |
 |------|---------|-------------|
-| `ubuntu_container_t` | Domain for all processes inside the LXC container | Any process spawned by LXC |
+| `ubuntu_system_t` | Domain for Ubuntu systemd and all spawn processes | Any process after `switch_root` |
 | `ubuntu_binder_bridge_t` | Sub-domain for the binder bridge daemon | `binder-bridge` binary |
-| `ubuntu_container_exec_t` | File type for LXC executables | `/system/bin/lxc-start`, `/system/bin/lxc-attach` |
-| `ubuntu_container_data_t` | File type for container data | `/data/ubuntu/**` |
+| `ubuntu_exec_t` | File type for Ubuntu binaries in the rootfs | Executables in SquashFS |
+| `ubuntu_data_t` | File type for userdata overlay | `/data/uhl_overlay/**` |
 
 ---
 

@@ -68,7 +68,7 @@ Ubuntu Process → /dev/binder → servicemanager → Vendor HAL
 
 - **AIDL only** — no HIDL, no hwbinder
 - **Optional access** — HAL wrappers degrade to mock mode if vendor HAL missing
-- **No vendor partition mount** — all access is via binder IPC
+- **Vendor partition mounted read-only** at `/vendor` by the custom init (Stage 2) and bind-mounted into the Ubuntu root via `mount.sh`
 
 ## Filesystem Layers
 

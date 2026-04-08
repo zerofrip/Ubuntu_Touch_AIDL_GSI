@@ -1,6 +1,6 @@
-# Security Threat Model — Ubuntu GSI Container
+# Security Threat Model — Ubuntu GSI
 
-This document analyzes attack surfaces, threat scenarios, and mitigations for the Ubuntu LXC container running on an Android GSI.
+This document analyzes attack surfaces, threat scenarios, and mitigations for Ubuntu running directly on Android hardware via the custom init + OverlayFS pivot architecture.
 
 ---
 
@@ -8,34 +8,49 @@ This document analyzes attack surfaces, threat scenarios, and mitigations for th
 
 ```mermaid
 graph TB
-    subgraph HOST["Android Host (PID namespace 0)"]
-        INIT["Android init (PID 1)"]
-        SM["servicemanager"]
-        LOGD["logd"]
-        KERNEL["Linux Kernel"]
+    subgraph HOST["Android Hardware Layer"]
+        VENDOR["Vendor HALs (/vendor, read-only)"]
+        KERNEL["Linux Kernel (vendor)"]
         SELINUX["SELinux (Enforcing)"]
     end
 
-    subgraph CONTAINER["Ubuntu LXC Container (isolated namespaces)"]
-        SYSTEMD["systemd (container PID 1)"]
+    subgraph INIT["Custom init (/init/init)"]
+        STAGE1["Mount /proc /sys /dev"]
+        STAGE2["Mount /vendor ro"]
+        STAGE3["Mount BinderFS"]
+        STAGE4["detect-gpu / detect-services"]
+    end
+
+    subgraph PIVOT["mount.sh (OverlayFS Pivot)"]
+        SQUASH["Mount linux_rootfs.squashfs (ro)"]
+        OVERLAY["OverlayFS: squashfs + uhl_overlay/upper"]
+        SWROOT["switch_root → systemd"]
+    end
+
+    subgraph UBUNTU["Ubuntu Userspace (systemd PID 1)"]
+        SYSTEMD["systemd"]
         BB["binder-bridge"]
         APPS["Ubuntu applications"]
     end
 
     subgraph SECURITY["Security Controls"]
-        SECCOMP["Seccomp Profile"]
-        CAPS["Capability Drops"]
-        CGROUPSL["cgroup Limits"]
-        NS["Namespace Isolation"]
+        SECCOMP["Seccomp (vendor kernel)"]
+        SELINUXP["SELinux MAC policy"]
+        ROBASE["Read-only SquashFS base"]
+        SNAP["3-gen snapshot rollback"]
     end
 
-    CONTAINER -->|"/dev/binder only"| SM
-    SECURITY -.->|enforces| CONTAINER
-    SELINUX -.->|"MAC policy"| CONTAINER
+    INIT --> PIVOT
+    PIVOT --> UBUNTU
+    UBUNTU -->|"/dev/binder"| VENDOR
+    SECURITY -.->|enforces| UBUNTU
+    SELINUX -.->|"MAC policy"| UBUNTU
     KERNEL -.->|"syscall filter"| SECCOMP
 
     style HOST fill:#1a1a2e,color:#eee
-    style CONTAINER fill:#16213e,color:#eee
+    style INIT fill:#0f3460,color:#eee
+    style PIVOT fill:#16213e,color:#eee
+    style UBUNTU fill:#1a1a2e,color:#eee
     style SECURITY fill:#0f3460,color:#eee
 ```
 
@@ -45,11 +60,11 @@ graph TB
 
 | Boundary | Description | Protection |
 |----------|-------------|------------|
-| **Container ↔ Host kernel** | Syscall interface | Seccomp filter, SELinux MAC |
-| **Container ↔ Binder** | IPC via `/dev/binder` | SELinux `binder_call` rules, cgroup device ACL |
-| **Container ↔ Filesystem** | Mount namespace | OverlayFS, no vendor mount, read-only system |
-| **Container ↔ Network** | veth interface | Network namespace, iptables on host |
-| **Container ↔ Devices** | `/dev/*` access | cgroup device controller, seccomp `mknod` deny |
+| **Ubuntu ↔ Kernel** | Syscall interface | SELinux MAC, seccomp (vendor kernel) |
+| **Ubuntu ↔ Binder** | IPC via `/dev/binder` | SELinux `binder_call` rules |
+| **Ubuntu ↔ /vendor** | Read-only bind mount | Mounted `ro`; writes blocked at VFS level |
+| **Ubuntu ↔ userdata** | OverlayFS upper layer | `nosuid,nodev` mount options |
+| **Ubuntu ↔ system** | system.img at `/` (squashfs lower) | Read-only SquashFS; immutable |
 
 ---
 
@@ -65,18 +80,9 @@ graph TB
 | Binder use-after-free (kernel CVE) | **High** | Kernel patching responsibility on vendor; seccomp blocks exploit primitives | Medium — depends on vendor kernel updates |
 | Accessing non-AIDL services | **Medium** | SELinux `binder_call` allow-list only permits known AIDL HAL types | Low |
 
-### 2. Container Escape
+### 2. Privilege Escalation
 
-| Threat | Risk | Mitigation | Residual Risk |
-|--------|------|------------|---------------|
-| `CAP_SYS_ADMIN` abuse (mount manipulation) | **Critical** | Dropped via `lxc.cap.drop`, seccomp denies `mount` with `MS_MOVE` | Low |
-| Kernel module loading | **Critical** | `CAP_SYS_MODULE` dropped, seccomp denies `init_module`/`finit_module` | Very Low |
-| `/proc` or `/sys` write exploitation | **High** | Mounted `mixed`/`ro`; SELinux `neverallow` write to proc/sys | Low |
-| `ptrace` on host processes | **High** | seccomp denies `ptrace`, `CAP_SYS_PTRACE` dropped | Very Low |
-| `open_by_handle_at` (CVE-2015-1335) | **High** | seccomp explicitly denies `open_by_handle_at` | Very Low |
-| Namespace escape via `setns`/`unshare` | **High** | seccomp denies `setns` and `unshare` | Very Low |
-| `pivot_root` to host filesystem | **High** | seccomp denies `pivot_root` | Very Low |
-| Device node creation (`mknod`) | **High** | `CAP_MKNOD` dropped, seccomp denies `mknod`/`mknodat` | Very Low |
+> Ubuntu runs as a direct systemd session after `switch_root` with no container namespace isolation. Privilege escalation mitigations rely on SELinux and the vendor kernel's seccomp support.
 
 ### 3. Filesystem
 

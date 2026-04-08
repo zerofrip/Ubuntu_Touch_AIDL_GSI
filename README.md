@@ -1,7 +1,7 @@
 # Ubuntu Touch GSI — Mobile Linux for Android Devices
 
-[![Build](https://github.com/zerofrip/Ubuntu_GSI/actions/workflows/build.yml/badge.svg)](https://github.com/zerofrip/Ubuntu_GSI/actions/workflows/build.yml)
-[![Lint](https://github.com/zerofrip/Ubuntu_GSI/actions/workflows/lint.yml/badge.svg)](https://github.com/zerofrip/Ubuntu_GSI/actions/workflows/lint.yml)
+[![Build](https://github.com/zerofrip/Ubuntu_Touch_GSI/actions/workflows/build.yml/badge.svg)](https://github.com/zerofrip/Ubuntu_Touch_GSI/actions/workflows/build.yml)
+[![Lint](https://github.com/zerofrip/Ubuntu_Touch_GSI/actions/workflows/lint.yml/badge.svg)](https://github.com/zerofrip/Ubuntu_Touch_GSI/actions/workflows/lint.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 A production-grade Ubuntu Touch distribution that runs natively on Android Treble devices. Uses AIDL-only binder IPC, Mir/Wayland display, and Lomiri shell to deliver a full Linux mobile experience on Android hardware.
@@ -76,8 +76,8 @@ Edit `config.env`:
 |----------|---------|-------------|
 | `ROOTFS_URL` | UBports Focal arm64 | Rootfs download URL |
 | `SQUASHFS_COMP` | `xz` | Compression algorithm |
-| `SYSTEM_IMG_SIZE_MB` | `512` | system.img size |
-| `USERDATA_IMG_SIZE_MB` | `4096` | userdata.img size |
+| `SYSTEM_IMG_SIZE_MB` | `0` (auto) | system.img size; `0` = content + 8 MB headroom (min 16 MB) |
+| `USERDATA_IMG_SIZE_MB` | `0` (auto) | userdata.img size; `0` = squashfs + 64 MB headroom; expands on first boot |
 | `ARCH` | `arm64` | Target architecture |
 
 ## 📱 Flash to Device
@@ -107,13 +107,26 @@ make check-device     # Checks Treble, architecture, bootloader unlock
 
 ## 🖥️ First Boot
 
-On first boot, the system automatically:
+On first boot an **interactive terminal** appears on `/dev/console` to set the userdata partition size:
+
+```
+═══════════════════════════════════════════════════════════
+  Ubuntu GSI — System Partition Setup
+═══════════════════════════════════════════════════════════
+  Device        : /dev/block/bootdevice/by-name/userdata
+  Total capacity: 128.0 GB  (131072 MB)
+  Formats: 20G / 512M / 50% / all (default) / skip
+  Size [all]: _
+```
+
+After confirming, `resize2fs` expands the userdata ext4 to the selected size. The system then automatically:
 
 1. Creates default user: **ubuntu** / **ubuntu**
 2. Configures locale (en_US.UTF-8)
-3. Enables NetworkManager and SSH
-4. Masks incompatible systemd units
-5. Starts Lomiri graphical shell
+3. Sets timezone to UTC
+4. Enables NetworkManager and SSH
+5. Masks incompatible systemd units
+6. Sets `graphical.target` for Lomiri shell
 
 **SSH access (after boot):**
 ```bash

@@ -1,6 +1,114 @@
 # System Image Directory Layout
 
-This document describes the complete directory structure of the Ubuntu GSI system partition and the runtime data layout.
+This document describes the directory structure of both flashable images and the runtime filesystem view after the OverlayFS pivot.
+
+---
+
+## System Partition (`system.img`) — Read-Only, Minimal
+
+Built by `builder/scripts/gsi-pack.sh`. Its only purpose is to provide a custom init that pivots the root filesystem to the Ubuntu SquashFS stored on the userdata partition.
+
+Size is auto-computed: content size + 8 MB headroom (minimum 16 MB). Override via `SYSTEM_IMG_SIZE_MB` in `config.env`.
+
+```
+/                               ← ext4 root (system.img)
+├── init/
+│   ├── init                    ← Custom PID-1 shell script (Stages 1–6)
+│   └── mount.sh                ← OverlayFS pivot + switch_root script
+├── scripts/
+│   ├── detect-gpu.sh           ← Probe vendor Vulkan/EGL presence → /tmp/gpu_state
+│   ├── detect-vendor-services.sh ← Binder service liveness check → /tmp/binder_state
+│   └── ...                     ← Additional detection and utility scripts
+├── system/                     ← Empty directory stub
+├── data/                       ← Empty directory (populated from userdata at runtime)
+├── dev/
+│   └── binderfs/               ← Empty mount point for BinderFS
+└── vendor/                     ← Mount point for vendor partition (ro, ext4)
+```
+
+**What is NOT in `system.img`:**
+- No Android `servicemanager`, `logd`, or any Android userspace binaries
+- No LXC or container runtime
+- No Ubuntu packages — the Ubuntu rootfs lives entirely in `userdata.img`
+
+---
+
+## Userdata Partition (`userdata.img`) — Read-Write
+
+Built by `scripts/build_userdata_img.sh`. Kept **minimal** at flash time (`linux_rootfs.squashfs` size + 64 MB headroom) and expanded to the user-selected size on first boot via `resize2fs`.
+
+Override auto-size via `USERDATA_IMG_SIZE_MB` in `config.env`.
+
+```
+/                               ← ext4 root (userdata.img)
+├── linux_rootfs.squashfs       ← Full Ubuntu arm64 rootfs (SquashFS, xz-compressed, read-only)
+└── uhl_overlay/
+    ├── upper/                  ← OverlayFS upper layer (all persistent writes go here)
+    ├── work/                   ← OverlayFS work directory (kernel internal use)
+    ├── snapshot.1/             ← Snapshot of upper/ captured at previous boot
+    ├── snapshot.2/             ← Older snapshot (rotated each boot)
+    ├── snapshot.3/             ← Oldest snapshot (generation > 3 garbage-collected)
+    ├── rollback                ← (optional) trigger file: if present, restores snapshot.1 on next boot
+    ├── .firstboot_complete     ← Marker: firstboot.service already completed
+    ├── firstboot.log           ← firstboot.sh output log
+    ├── rollback.log            ← mount.sh pivot + snapshot rotation log
+    └── snapshot_rotation.log   ← Snapshot generation audit log
+```
+
+---
+
+## Runtime Filesystem View (`/rootfs/merged`) — Post-Pivot
+
+After `switch_root`, the OverlayFS merged view becomes the root filesystem seen by systemd and all Ubuntu processes.
+
+```
+/                               ← OverlayFS merged
+│                                  (lower = linux_rootfs.squashfs)
+│                                  (upper = /data/uhl_overlay/upper)
+│
+├── data/uhl_overlay/           ← Bind-mounted from host /data/uhl_overlay
+│   ├── upper/
+│   ├── work/
+│   ├── snapshot.{1,2,3}/
+│   ├── .firstboot_complete
+│   └── *.log
+│
+├── vendor/                     ← Bind-mounted from host /vendor (read-only)
+│
+├── dev/
+│   └── binderfs/               ← Bind-mounted from host /dev/binderfs
+│       ├── binder              (also symlinked as /dev/binder)
+│       ├── vndbinder           (also symlinked as /dev/vndbinder)
+│       └── hwbinder            (also symlinked as /dev/hwbinder)
+│
+├── tmp/
+│   ├── gpu_state               ← GPU detection result: Vulkan / EGL / Software
+│   └── binder_state            ← Binder service liveness: IPC_LIVE / IPC_DEAD
+│
+├── lib/systemd/systemd         ← New PID 1 (executed by switch_root)
+│
+├── etc/systemd/system/
+│   ├── ubuntu-gsi-firstboot.service
+│   ├── binder-bridge.service
+│   └── lomiri.service
+│
+└── usr/lib/ubuntu-gsi/
+    └── firstboot.sh            ← First-boot initialization script
+```
+
+---
+
+## Key Design Decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| Ubuntu rootfs in `userdata`, not `system` | Avoids dm-verity restrictions; no OEM signing key required |
+| SquashFS for rootfs | ~50 % size reduction vs. raw ext4; immutable read-only base layer |
+| OverlayFS upper layer on `userdata` | `apt install` / config changes persist across reboots without touching `system` |
+| 3-generation snapshot rotation | One-command rollback to previous state without fastboot |
+| Minimal `system.img` | Passes dm-verity; only init + mount logic needed on the signed partition |
+| Auto-expand on first boot | Delivers a small flashable image; uses full device storage at runtime |
+
 
 ---
 
