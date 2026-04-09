@@ -224,7 +224,6 @@ echo "$SELECTED_TZ" | run_as_root tee /etc/timezone >/dev/null 2>>"$LOG" || true
 log "Timezone set to $SELECTED_TZ"
 
 # --- Language ---
-LANG_BASE="${SELECTED_LANG%%.*}"
 if [ -f /etc/locale.gen ]; then
     run_as_root sed -i "s/^# *${SELECTED_LANG}/${SELECTED_LANG}/" /etc/locale.gen 2>>"$LOG" || true
     run_as_root locale-gen 2>>"$LOG" || true
