@@ -102,6 +102,7 @@ info "Installing supporting packages..."
 
 apt-get install -y --no-install-recommends \
     onboard \
+    zenity \
     fonts-ubuntu \
     fonts-noto \
     adwaita-icon-theme \

@@ -185,7 +185,7 @@ if [ -d "$SYSTEMD_DIR" ]; then
     cp "$SYSTEMD_DIR"/*.timer "$TARGET_DIR/etc/systemd/system/" 2>/dev/null || true
 
     # Enable services
-    for service in binder-bridge lomiri ubuntu-gsi-firstboot; do
+    for service in binder-bridge lomiri ubuntu-gsi-firstboot ubuntu-gsi-setup-wizard; do
         if [ -f "$TARGET_DIR/etc/systemd/system/${service}.service" ]; then
             chroot "$TARGET_DIR" systemctl enable "${service}.service" 2>/dev/null || true
             info "Enabled: ${service}.service"
@@ -229,6 +229,11 @@ fi
 # Firstboot script
 if [ -f "$TARGET_DIR/usr/lib/ubuntu-gsi/firstboot.sh" ]; then
     chmod +x "$TARGET_DIR/usr/lib/ubuntu-gsi/firstboot.sh"
+fi
+
+# Setup wizard script
+if [ -f "$TARGET_DIR/usr/lib/ubuntu-gsi/setup-wizard.sh" ]; then
+    chmod +x "$TARGET_DIR/usr/lib/ubuntu-gsi/setup-wizard.sh"
 fi
 
 success "Ubuntu GSI components installed"

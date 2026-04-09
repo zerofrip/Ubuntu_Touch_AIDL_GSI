@@ -11,11 +11,8 @@ ExecStart=/usr/lib/ubuntu-gsi/firstboot.sh
 RemainAfterExit=yes
 TimeoutStartSec=0
 
-StandardInput=tty
-StandardOutput=tty
+StandardOutput=journal
 StandardError=journal
-TTYPath=/dev/console
-TTYReset=yes
 SyslogIdentifier=ubuntu-gsi-firstboot
 
 [Install]
