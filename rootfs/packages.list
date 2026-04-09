@@ -38,6 +38,24 @@ upower
 # Utilities
 jq
 curl
+
+# GUI / Display
+mir-graphics-drivers-desktop
+mir-platform-graphics-wayland
+lomiri
+lomiri-system-settings
+lomiri-indicator-network
+lomiri-indicator-datetime
+lomiri-indicator-session
+lomiri-indicator-power
+
+# On-screen keyboard & setup wizard
+onboard
+zenity
+fonts-ubuntu
+fonts-noto
+adwaita-icon-theme
+dbus-x11
 nano
 less
 htop
