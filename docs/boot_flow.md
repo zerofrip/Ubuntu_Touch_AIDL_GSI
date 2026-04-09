@@ -36,12 +36,13 @@ sequenceDiagram
     M->>M: Copy gpu_state and binder_state to merged/tmp/
     M->>SD: switch_root /rootfs/merged systemd --log-target=kmsg
     SD->>FB: ubuntu-gsi-firstboot.service (first boot only)
-    FB->>FB: Step 0 - Interactive TTY, resize userdata partition
+    FB->>FB: Step 0 - Auto resize userdata partition (full)
     FB->>FB: Step 1 - Create ubuntu user
     FB->>FB: Steps 2-6 - Locale / timezone / SSH / units / target
-    FB->>FB: Write .firstboot_complete marker
+    FB->>FB: Write .firstboot_complete + .setup_wizard_pending
     SD->>SV: binder-bridge.service (AIDL HAL proxies)
     SD->>SV: lomiri.service - Mir compositor - Ubuntu Touch UI
+    SD->>SV: ubuntu-gsi-setup-wizard.service (GUI wizard, first boot only)
 ```
 
 ---
@@ -119,18 +120,32 @@ systemd becomes the new PID 1 inside the Ubuntu root.
 
 ### Phase 6 — First Boot (`ubuntu-gsi-firstboot.service`)
 
-Runs exactly once. `StandardInput=tty` on `/dev/console`; `TimeoutStartSec=0` (waits indefinitely for user input).
+Runs exactly once. Fully non-interactive; all output goes to the journal.
 
 | Step | Action |
 |------|--------|
-| **0** | **Interactive partition resize** — display device info + prompt; call `resize2fs` with user-supplied size (`20G` / `50%` / `all` / `skip`) |
+| **0** | **Automatic partition resize** — `resize2fs` expands userdata to full partition capacity |
 | **1** | Create user `ubuntu` (password `ubuntu`), groups `sudo,audio,video,input,render`; configure `NOPASSWD` sudo |
 | **2** | Generate `en_US.UTF-8` locale |
 | **3** | Set timezone to UTC |
 | **4** | Enable NetworkManager and SSH daemon |
 | **5** | Mask incompatible units (`systemd-udevd`, `systemd-modules-load`, …) |
 | **6** | Set `graphical.target` as default systemd target |
-| Done | Write `/data/uhl_overlay/.firstboot_complete` |
+| Done | Write `/data/uhl_overlay/.firstboot_complete` and `/data/uhl_overlay/.setup_wizard_pending` |
+
+### Phase 7 — GUI Setup Wizard (`ubuntu-gsi-setup-wizard.service`)
+
+Runs after Lomiri starts on first boot. Provides a touch-friendly graphical setup using `zenity` dialogs with `onboard` on-screen keyboard.
+
+| Step | Action |
+|------|--------|
+| **1** | Launch on-screen keyboard (`onboard`) automatically |
+| **2** | Username setup — change from default `ubuntu` |
+| **3** | Password setup — set new password (with confirmation) |
+| **4** | Timezone selection — pick from common timezones |
+| **5** | Language selection — choose system locale |
+| **6** | Apply settings (usermod, chpasswd, locale-gen, etc.) |
+| Done | Write `/data/uhl_overlay/.setup_wizard_complete`; remove `.setup_wizard_pending` |
 
 ---
 
@@ -138,10 +153,12 @@ Runs exactly once. `StandardInput=tty` on `/dev/console`; `TimeoutStartSec=0` (w
 
 | Aspect | First Boot | Subsequent Boots |
 |--------|------------|-----------------|
-| Partition resize | Interactive TTY prompt | Skipped (marker present) |
+| Partition resize | Automatic (full) | Skipped (marker present) |
 | User creation | `ubuntu` / `ubuntu` created | Already exists |
-| Boot time (approx.) | ~60 s (includes partition resize) | ~15–30 s to login |
+| GUI Setup Wizard | Launches after Lomiri | Skipped (marker present) |
+| Boot time (approx.) | ~60 s (includes partition resize + wizard) | ~15–30 s to login |
 | `firstboot.service` | Runs to completion | Exits immediately (idempotent) |
+| `setup-wizard.service` | Runs after Lomiri | Exits immediately (idempotent) |
 
 ---
 

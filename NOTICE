@@ -125,5 +125,122 @@ Source: https://github.com/seccomp/libseccomp
 Tag:    v2.6.0
 
 ================================================================================
+Lomiri Shell (Ubuntu Touch Desktop)
+================================================================================
+
+Copyright (C) 2013-2024 Canonical Ltd.
+Copyright (C) 2020-2024 UBports Foundation
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 3 of the License.
+
+Includes the following components distributed under the same license:
+  - lomiri-system-settings
+  - lomiri-indicator-network
+  - lomiri-indicator-datetime
+  - lomiri-indicator-session
+  - lomiri-indicator-power
+
+Source: https://gitlab.com/ubports/development/core/lomiri
+Packages: https://repo.ubports.com/
+
+================================================================================
+Mir Display Server
+================================================================================
+
+Copyright (C) 2012-2024 Canonical Ltd.
+
+Mir is licensed under the GNU General Public License version 2 (GPLv2)
+and the GNU Lesser General Public License version 3 (LGPLv3).
+
+Components used:
+  - mir-graphics-drivers-desktop
+  - mir-platform-graphics-wayland
+
+Source: https://github.com/canonical/mir
+
+================================================================================
+Onboard — On-screen Keyboard
+================================================================================
+
+Copyright (C) 2009-2024 marmuta <marmvta@gmail.com>
+Copyright (C) 2012-2024 Gerd Kohlberger <lowkeyed@gmail.com>
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 3 of the License.
+
+Source: https://launchpad.net/onboard
+
+================================================================================
+Zenity — Display Graphical Dialogs from Shell Scripts
+================================================================================
+
+Copyright (C) 2003-2024 GNOME Project
+
+Zenity is free software; you can redistribute it and/or modify it under
+the terms of the GNU Lesser General Public License as published by the
+Free Software Foundation; either version 2.1 of the License, or (at
+your option) any later version.
+
+Source: https://gitlab.gnome.org/GNOME/zenity
+
+================================================================================
+Fonts
+================================================================================
+
+Ubuntu Font Family
+  Copyright (C) 2010-2024 Canonical Ltd.
+  Licensed under the Ubuntu Font Licence, Version 1.0.
+  Source: https://design.ubuntu.com/font
+
+Noto Fonts
+  Copyright (C) 2012-2024 Google LLC
+  Licensed under the SIL Open Font License, Version 1.1.
+  Source: https://github.com/googlefonts/noto-fonts
+
+================================================================================
+Adwaita Icon Theme
+================================================================================
+
+Copyright (C) GNOME Project
+
+Licensed under the GNU Lesser General Public License v3 or later (LGPL-3.0+)
+and Creative Commons Attribution-ShareAlike 3.0 (CC-BY-SA-3.0).
+
+Source: https://gitlab.gnome.org/GNOME/adwaita-icon-theme
+
+================================================================================
+D-Bus X11 Integration (dbus-x11)
+================================================================================
+
+Copyright (C) 2002-2024 Red Hat, Inc. and others
+
+Licensed under the GNU General Public License version 2 or later (GPL-2.0+).
+A copy of the license is available at: https://www.gnu.org/licenses/gpl-2.0.html
+
+Source: https://www.freedesktop.org/wiki/Software/dbus/
+
+================================================================================
+Source Code Availability (GPL/LGPL Compliance)
+================================================================================
+
+This distribution includes binary packages licensed under the GNU General
+Public License (GPL) and the GNU Lesser General Public License (LGPL).
+In compliance with these licenses, the corresponding source code for all
+GPL/LGPL components can be obtained from the following locations:
+
+  Ubuntu archive:   https://packages.ubuntu.com/
+  UBports repo:     https://repo.ubports.com/
+  Launchpad:        https://launchpad.net/
+
+Alternatively, you may request a copy of the source code by contacting the
+project maintainers at the repository URL below. Source will be provided
+for a period of at least three years from the date of distribution.
+
+  Repository: https://github.com/zerofrip/Ubuntu_Touch_GSI
+
+================================================================================
 End of NOTICE
 ================================================================================

@@ -107,26 +107,22 @@ make check-device     # Checks Treble, architecture, bootloader unlock
 
 ## 🖥️ First Boot
 
-On first boot an **interactive terminal** appears on `/dev/console` to set the userdata partition size:
+On first boot, the system automatically:
 
-```
-═══════════════════════════════════════════════════════════
-  Ubuntu GSI — System Partition Setup
-═══════════════════════════════════════════════════════════
-  Device        : /dev/block/bootdevice/by-name/userdata
-  Total capacity: 128.0 GB  (131072 MB)
-  Formats: 20G / 512M / 50% / all (default) / skip
-  Size [all]: _
-```
+1. Expands the userdata partition to full capacity (`resize2fs`)
+2. Creates temporary default user: **ubuntu** / **ubuntu**
+3. Configures locale, timezone, networking
+4. Enables SSH
+5. Launches **Lomiri Shell** (Mir/Wayland)
+6. Starts the **GUI Setup Wizard** (with on-screen keyboard)
 
-After confirming, `resize2fs` expands the userdata ext4 to the selected size. The system then automatically:
+The Setup Wizard allows you to configure:
+- Username
+- Password
+- Timezone
+- System language
 
-1. Creates default user: **ubuntu** / **ubuntu**
-2. Configures locale (en_US.UTF-8)
-3. Sets timezone to UTC
-4. Enables NetworkManager and SSH
-5. Masks incompatible systemd units
-6. Sets `graphical.target` for Lomiri shell
+> No physical keyboard required — the on-screen keyboard (Onboard) launches automatically.
 
 **SSH access (after boot):**
 ```bash
@@ -150,7 +146,12 @@ Ubuntu_GSI/
 ├── rootfs/                        # Rootfs configuration
 │   ├── packages.list              # Required packages
 │   ├── overlay/                   # Files injected into rootfs
+│   │   └── usr/lib/ubuntu-gsi/
+│   │       ├── firstboot.sh       # Non-interactive first boot
+│   │       └── setup-wizard.sh    # GUI setup wizard (zenity)
 │   └── systemd/                   # Systemd service units
+│       ├── ubuntu-gsi-firstboot.service
+│       └── ubuntu-gsi-setup-wizard.service
 ├── gui/                           # GUI stack
 │   ├── install_lomiri.sh          # Lomiri installer
 │   └── start_lomiri.sh            # Compositor launcher
@@ -218,6 +219,8 @@ reboot
 | adb doesn't work after flash | **Expected** — use SSH instead |
 | Black screen after flash | Reflash both images: `make flash` |
 | GUI doesn't start | Check `journalctl -u lomiri` |
+| Setup wizard doesn't appear | Check `journalctl -u ubuntu-gsi-setup-wizard` |
+| On-screen keyboard missing | Verify `onboard` is installed: `dpkg -l onboard` |
 | SSH can't connect | Wait 30s for firstboot to complete |
 | userdata.img too small | Increase `USERDATA_IMG_SIZE_MB` in config.env |
 
@@ -256,15 +259,23 @@ See [threat_model.md](docs/threat_model.md) for details.
 
 ## Third-Party Components
 
-| Component | License |
-|-----------|---------|
-| AOSP frameworks/native | Apache 2.0 |
-| AOSP system/core | Apache 2.0 |
-| AOSP system/sepolicy | Apache 2.0 |
-| LXC | LGPL-2.1+ |
-| libseccomp | LGPL-2.1 |
+| Component | License | Source |
+|-----------|---------|--------|
+| AOSP frameworks/native | Apache 2.0 | [AOSP](https://android.googlesource.com/platform/frameworks/native) |
+| AOSP system/core | Apache 2.0 | [AOSP](https://android.googlesource.com/platform/system/core) |
+| AOSP system/sepolicy | Apache 2.0 | [AOSP](https://android.googlesource.com/platform/system/sepolicy) |
+| LXC | LGPL-2.1+ | [GitHub](https://github.com/lxc/lxc) |
+| libseccomp | LGPL-2.1 | [GitHub](https://github.com/seccomp/libseccomp) |
+| Lomiri Shell | GPL-3.0 | [GitLab](https://gitlab.com/ubports/development/core/lomiri) |
+| Mir Display Server | GPL-2.0 / LGPL-3.0 | [GitHub](https://github.com/canonical/mir) |
+| Onboard (OSK) | GPL-3.0 | [Launchpad](https://launchpad.net/onboard) |
+| Zenity | LGPL-2.1+ | [GitLab](https://gitlab.gnome.org/GNOME/zenity) |
+| Ubuntu Font Family | Ubuntu Font Licence 1.0 | [Ubuntu](https://design.ubuntu.com/font) |
+| Noto Fonts | OFL-1.1 | [GitHub](https://github.com/googlefonts/noto-fonts) |
+| Adwaita Icon Theme | LGPL-3.0+ / CC-BY-SA-3.0 | [GitLab](https://gitlab.gnome.org/GNOME/adwaita-icon-theme) |
+| dbus-x11 | GPL-2.0+ | [freedesktop.org](https://www.freedesktop.org/wiki/Software/dbus/) |
 
-See [NOTICE](NOTICE) for full attribution.
+See [NOTICE](NOTICE) for full attribution and source code availability.
 
 ## 📄 License
 
