@@ -55,13 +55,10 @@ jobs:
             debootstrap \
             qemu-user-static
 
-      - name: Create test rootfs
+      - name: Build rootfs with packages.list
         run: |
-          # CI uses a minimal placeholder rootfs
-          mkdir -p builder/out/ubuntu-rootfs/etc
-          echo "CI_BUILD=true" > builder/out/ubuntu-rootfs/etc/ci-marker
-          mkdir -p builder/out/ubuntu-rootfs/lib/systemd
-          touch builder/out/ubuntu-rootfs/lib/systemd/systemd
+          chmod +x scripts/build_rootfs.sh
+          sudo bash scripts/build_rootfs.sh
 
       - name: Build system.img
         run: |
