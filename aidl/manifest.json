@@ -64,6 +64,30 @@
       "critical": false,
       "start_delay": 0,
       "description": "Touchscreen/input via libinput to vendor input drivers"
+    },
+    {
+      "name": "gnss",
+      "aidl_interface": "android.hardware.gnss.IGnss",
+      "binary": "/system/aidl/gnss/gnss_hal.sh",
+      "critical": false,
+      "start_delay": 3,
+      "description": "GNSS/GPS via gpsd/geoclue to vendor GNSS HAL"
+    },
+    {
+      "name": "bluetooth",
+      "aidl_interface": "android.hardware.bluetooth.IBluetoothHci",
+      "binary": "/system/aidl/bluetooth/bluetooth_hal.sh",
+      "critical": false,
+      "start_delay": 2,
+      "description": "Bluetooth via BlueZ to vendor BT firmware"
+    },
+    {
+      "name": "vibrator",
+      "aidl_interface": "android.hardware.vibrator.IVibrator",
+      "binary": "/system/aidl/vibrator/vibrator_hal.sh",
+      "critical": false,
+      "start_delay": 0,
+      "description": "Vibrator via sysfs timed_output/LED/FF input"
     }
   ]
 }

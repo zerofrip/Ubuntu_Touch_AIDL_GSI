@@ -1,0 +1,22 @@
+[Unit]
+Description=Ubuntu GSI Sensor HAL — IIO/iio-sensor-proxy Bridge
+Documentation=https://github.com/zerofrip/Ubuntu_Touch_GSI
+After=binder-bridge.service systemd-udevd.service
+Wants=binder-bridge.service
+ConditionPathExists=/usr/lib/ubuntu-gsi/aidl/sensors/sensors_hal.sh
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/ubuntu-gsi/aidl/sensors/sensors_hal.sh
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=30
+
+# Security hardening
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/run/ubuntu-gsi /data/uhl_overlay /dev /sys/bus/iio
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

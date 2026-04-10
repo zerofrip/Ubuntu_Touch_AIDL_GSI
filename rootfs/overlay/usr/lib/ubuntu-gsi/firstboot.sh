@@ -167,6 +167,155 @@ CAMEOF
 log "Camera udev rules installed"
 
 # ---------------------------------------------------------------------------
+# 4-sensor. IIO sensor permissions and iio-sensor-proxy setup
+# ---------------------------------------------------------------------------
+log "Configuring IIO sensor permissions"
+
+# Set IIO sysfs attributes readable
+for iio_dev in /sys/bus/iio/devices/iio:device*; do
+    [ -d "$iio_dev" ] || continue
+    chmod -R a+r "$iio_dev" 2>/dev/null || true
+done
+
+# Set IIO character device permissions
+for iio_cdev in /dev/iio:device*; do
+    [ -c "$iio_cdev" ] || continue
+    chmod 0666 "$iio_cdev" 2>/dev/null || true
+done
+
+# Add IIO udev rules for persistent sensor permissions
+cat >> /etc/udev/rules.d/50-ubuntu-gsi-gpu.rules << 'IIOEOF'
+
+# IIO sensor devices (light, proximity, accelerometer, gyro)
+SUBSYSTEM=="iio", MODE="0666"
+KERNEL=="iio:device*", MODE="0666"
+IIOEOF
+log "IIO sensor udev rules installed"
+
+# Enable iio-sensor-proxy service (D-Bus sensor API)
+if systemctl list-unit-files iio-sensor-proxy.service >/dev/null 2>&1; then
+    systemctl enable iio-sensor-proxy.service 2>/dev/null || true
+    log "iio-sensor-proxy.service enabled"
+fi
+
+# ---------------------------------------------------------------------------
+# 4-gps. GPS/GNSS subsystem setup
+# ---------------------------------------------------------------------------
+log "Configuring GPS/GNSS subsystem"
+
+# Set GNSS serial device permissions
+for gnss_dev in /dev/ttyHS* /dev/ttyMSM* /dev/gnss* /dev/ttyUSB*; do
+    [ -c "$gnss_dev" ] || continue
+    chmod 0666 "$gnss_dev" 2>/dev/null || true
+done
+
+# Add GNSS udev rules
+cat >> /etc/udev/rules.d/50-ubuntu-gsi-gpu.rules << 'GNSSEOF'
+
+# GNSS/GPS serial devices
+SUBSYSTEM=="tty", KERNEL=="ttyHS*", MODE="0666"
+SUBSYSTEM=="tty", KERNEL=="ttyMSM*", MODE="0666"
+SUBSYSTEM=="gnss", MODE="0666"
+GNSSEOF
+
+# Enable gpsd if installed
+if systemctl list-unit-files gpsd.service >/dev/null 2>&1; then
+    systemctl enable gpsd.service 2>/dev/null || true
+    systemctl enable gpsd.socket 2>/dev/null || true
+    log "gpsd.service enabled"
+fi
+
+# Enable geoclue for D-Bus location API
+if systemctl list-unit-files geoclue.service >/dev/null 2>&1; then
+    systemctl enable geoclue.service 2>/dev/null || true
+    log "geoclue.service enabled"
+fi
+
+# Add ubuntu user to dialout group (for serial GPS access)
+if id -u ubuntu >/dev/null 2>&1; then
+    usermod -aG dialout ubuntu 2>/dev/null || true
+fi
+log "GPS subsystem configured"
+
+# ---------------------------------------------------------------------------
+# 4-bt. Bluetooth subsystem setup
+# ---------------------------------------------------------------------------
+log "Configuring Bluetooth subsystem"
+
+# Unblock Bluetooth radio
+if command -v rfkill >/dev/null 2>&1; then
+    rfkill unblock bluetooth 2>/dev/null || true
+    log "rfkill: unblocked Bluetooth"
+fi
+
+# Symlink vendor Bluetooth firmware
+for fw_dir in /vendor/firmware /vendor/firmware/bt /odm/firmware; do
+    if [ -d "$fw_dir" ]; then
+        for fw_file in "$fw_dir"/BCM*.hcd "$fw_dir"/bt_*.bin "$fw_dir"/*.btp \
+                       "$fw_dir"/WCNSS*.bin "$fw_dir"/crc*.bin; do
+            [ -f "$fw_file" ] || continue
+            base=$(basename "$fw_file")
+            [ -e "/lib/firmware/$base" ] || ln -sf "$fw_file" "/lib/firmware/$base" 2>/dev/null || true
+        done
+        log "Linked BT firmware from $fw_dir"
+    fi
+done
+
+# Add ubuntu user to bluetooth group
+if id -u ubuntu >/dev/null 2>&1; then
+    usermod -aG bluetooth ubuntu 2>/dev/null || true
+fi
+
+# Enable BlueZ service
+if systemctl list-unit-files bluetooth.service >/dev/null 2>&1; then
+    systemctl enable bluetooth.service 2>/dev/null || true
+    log "bluetooth.service enabled"
+fi
+log "Bluetooth subsystem configured"
+
+# ---------------------------------------------------------------------------
+# 4-vibr. Vibrator device permissions
+# ---------------------------------------------------------------------------
+log "Configuring vibrator device permissions"
+
+# Android timed_output vibrator
+if [ -e /sys/class/timed_output/vibrator/enable ]; then
+    chmod 0666 /sys/class/timed_output/vibrator/enable 2>/dev/null || true
+    log "timed_output vibrator permissions set"
+fi
+
+# LED-class vibrator
+for led in /sys/class/leds/vibrator /sys/class/leds/vibrator_0; do
+    if [ -d "$led" ]; then
+        chmod 0666 "$led/brightness" 2>/dev/null || true
+        chmod 0666 "$led/activate" 2>/dev/null || true
+        chmod 0666 "$led/duration" 2>/dev/null || true
+        log "LED-class vibrator permissions set: $led"
+    fi
+done
+
+# Add vibrator udev rules
+cat >> /etc/udev/rules.d/50-ubuntu-gsi-gpu.rules << 'VIBREOF'
+
+# Vibrator devices
+SUBSYSTEM=="timed_output", MODE="0666"
+SUBSYSTEM=="leds", KERNEL=="vibrator*", ATTR{brightness}="0", MODE="0666"
+VIBREOF
+log "Vibrator udev rules installed"
+
+# ---------------------------------------------------------------------------
+# 4-hall. Hall sensor (lid switch) udev rule
+# ---------------------------------------------------------------------------
+log "Configuring hall sensor (lid switch)"
+
+cat >> /etc/udev/rules.d/50-ubuntu-gsi-gpu.rules << 'HALLEOF'
+
+# Hall sensor (lid switch) — allow logind to see SW_LID events
+SUBSYSTEM=="input", KERNEL=="event*", ENV{ID_INPUT_SWITCH}=="1", TAG+="power-switch"
+HALLEOF
+log "Hall sensor udev rules installed"
+
+# ---------------------------------------------------------------------------
 # 4a. WiFi subsystem setup
 # ---------------------------------------------------------------------------
 log "Configuring WiFi subsystem"

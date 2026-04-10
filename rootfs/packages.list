@@ -57,6 +57,16 @@ libasound2-plugins
 # Sensors
 iio-sensor-proxy
 
+# GPS / GNSS
+gpsd
+gpsd-clients
+geoclue-2.0
+
+# Bluetooth
+bluez
+bluetooth
+pulseaudio-module-bluetooth
+
 # Camera
 libcamera0.3
 libcamera-tools

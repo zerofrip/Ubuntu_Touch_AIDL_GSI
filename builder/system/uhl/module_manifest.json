@@ -41,6 +41,24 @@
       "binary": "/system/haf/input_daemon.sh",
       "critical": false,
       "delay_after": 0
+    },
+    {
+      "name": "GNSS Daemon",
+      "binary": "/system/haf/gnss_daemon.sh",
+      "critical": false,
+      "delay_after": 3
+    },
+    {
+      "name": "Bluetooth Daemon",
+      "binary": "/system/haf/bluetooth_daemon.sh",
+      "critical": false,
+      "delay_after": 2
+    },
+    {
+      "name": "Vibrator Daemon",
+      "binary": "/system/haf/vibrator_daemon.sh",
+      "critical": false,
+      "delay_after": 0
     }
   ]
 }

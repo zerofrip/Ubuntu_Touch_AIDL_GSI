@@ -1,0 +1,22 @@
+[Unit]
+Description=Ubuntu GSI GNSS HAL — gpsd/Geoclue GPS Bridge
+Documentation=https://github.com/zerofrip/Ubuntu_Touch_GSI
+After=binder-bridge.service systemd-udevd.service
+Wants=binder-bridge.service
+ConditionPathExists=/usr/lib/ubuntu-gsi/aidl/gnss/gnss_hal.sh
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/ubuntu-gsi/aidl/gnss/gnss_hal.sh
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=30
+
+# Security hardening
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/run/ubuntu-gsi /data/uhl_overlay /dev
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

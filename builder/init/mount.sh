@@ -155,6 +155,51 @@ if [ -d /vendor/firmware ]; then
     echo "[$(date -Iseconds)] [Master Pivot] Vendor firmware accessible via /vendor mount." >> "$LOG_FILE"
 fi
 
+# Bind-mount /sys/bus/iio for IIO sensor access (light, proximity, accel, etc.)
+if [ -d /sys/bus/iio/devices ]; then
+    mkdir -p "$MERGED/sys/bus/iio"
+    mount --bind /sys/bus/iio "$MERGED/sys/bus/iio"
+    echo "[$(date -Iseconds)] [Master Pivot] Bound /sys/bus/iio for sensor access." >> "$LOG_FILE"
+fi
+
+# Bind-mount /dev/iio:device* for IIO raw data access
+for iio_dev in /dev/iio:device*; do
+    [ -c "$iio_dev" ] || continue
+    iio_name=$(basename "$iio_dev")
+    touch "$MERGED/dev/$iio_name" 2>/dev/null
+    mount --bind "$iio_dev" "$MERGED/dev/$iio_name"
+done
+
+# Bind-mount GNSS/GPS serial devices
+for gnss_dev in /dev/ttyHS* /dev/ttyMSM* /dev/gnss* /dev/ttyUSB*; do
+    [ -c "$gnss_dev" ] || continue
+    gnss_name=$(basename "$gnss_dev")
+    touch "$MERGED/dev/$gnss_name" 2>/dev/null
+    mount --bind "$gnss_dev" "$MERGED/dev/$gnss_name"
+    echo "[$(date -Iseconds)] [Master Pivot] Bound $gnss_dev for GNSS access." >> "$LOG_FILE"
+done
+
+# Bind-mount /dev/uhid for Bluetooth HID device support
+if [ -c /dev/uhid ]; then
+    touch "$MERGED/dev/uhid" 2>/dev/null
+    mount --bind /dev/uhid "$MERGED/dev/uhid"
+    echo "[$(date -Iseconds)] [Master Pivot] Bound /dev/uhid for Bluetooth HID." >> "$LOG_FILE"
+fi
+
+# Bind-mount /sys/class/timed_output for vibrator (Android sysfs)
+if [ -d /sys/class/timed_output ]; then
+    mkdir -p "$MERGED/sys/class/timed_output"
+    mount --bind /sys/class/timed_output "$MERGED/sys/class/timed_output"
+    echo "[$(date -Iseconds)] [Master Pivot] Bound /sys/class/timed_output for vibrator." >> "$LOG_FILE"
+fi
+
+# Bind-mount /sys/class/leds for LED-class vibrator and indicator LEDs
+if [ -d /sys/class/leds ]; then
+    mkdir -p "$MERGED/sys/class/leds"
+    mount --bind /sys/class/leds "$MERGED/sys/class/leds"
+    echo "[$(date -Iseconds)] [Master Pivot] Bound /sys/class/leds for vibrator/LEDs." >> "$LOG_FILE"
+fi
+
 if [ ! -x "$MERGED/lib/systemd/systemd" ]; then
      echo "[$(date -Iseconds)] [Master Pivot] FATAL: Pivot execution aborted. Systemd target corrupted." >> "$LOG_FILE"
      exit 1
