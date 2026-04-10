@@ -127,12 +127,21 @@ cat > "$TARGET_DIR/etc/apt/sources.list.d/ubports.list" << 'UBEOF'
 deb http://repo.ubports.com/ focal main
 UBEOF
 
-# Import UBports GPG key (will be fetched during chroot apt-get update)
+# Import UBports GPG keys
 mkdir -p "$TARGET_DIR/etc/apt/trusted.gpg.d"
+
+# Key 1: UBports Apt Signing Key (from repo.ubports.com)
 if command -v wget >/dev/null 2>&1; then
-    wget -qO "$TARGET_DIR/etc/apt/trusted.gpg.d/ubports.gpg" \
-        "http://repo.ubports.com/keyring/keyring.gpg" 2>/dev/null || \
-        info "WARNING: Could not fetch UBports GPG key — packages may fail to verify"
+    wget -qO "$TARGET_DIR/etc/apt/trusted.gpg.d/ubports-signing.gpg" \
+        "http://repo.ubports.com/pubkey.gpg" 2>/dev/null || \
+        info "WARNING: Could not fetch UBports signing key from repo"
+fi
+
+# Key 2: UBports build key (from Ubuntu keyserver)
+if command -v gpg >/dev/null 2>&1; then
+    gpg --keyserver hkps://keyserver.ubuntu.com --recv-keys 4BD4B4D6DBB583F1 2>/dev/null && \
+    gpg --export 4BD4B4D6DBB583F1 > "$TARGET_DIR/etc/apt/trusted.gpg.d/ubports-build.gpg" 2>/dev/null || \
+        info "WARNING: Could not fetch UBports build key from keyserver"
 fi
 
 success "apt sources configured (including UBports PPA)"

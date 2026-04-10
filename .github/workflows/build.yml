@@ -64,7 +64,8 @@ jobs:
         run: |
           chmod +x build.sh builder/scripts/*.sh scripts/*.sh
           # Run build.sh but skip the download phase (rootfs already staged)
-          ROOTFS_TARBALL_NAME="SKIP" bash build.sh
+          # sudo required: build_rootfs.sh creates root-owned rootfs
+          sudo ROOTFS_TARBALL_NAME="SKIP" bash build.sh
 
       - name: Verify artifacts
         run: |
