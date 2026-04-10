@@ -960,6 +960,40 @@ FFEOF
     log "Firefox mobile touch profile created"
 fi
 
+# ---------------------------------------------------------------------------
+# 4q. OpenStore — Click App Store Setup
+# ---------------------------------------------------------------------------
+log "Configuring OpenStore for click package installation"
+
+if command -v openstore-client >/dev/null 2>&1; then
+    # Create OpenStore cache directory for ubuntu user
+    mkdir -p /home/ubuntu/.cache/open-store.io
+    mkdir -p /home/ubuntu/.local/share/open-store.io
+    chown -R ubuntu:ubuntu /home/ubuntu/.cache/open-store.io
+    chown -R ubuntu:ubuntu /home/ubuntu/.local/share/open-store.io
+
+    # Create desktop shortcut for OpenStore
+    OPENSTORE_DESKTOP="/home/ubuntu/.local/share/applications/openstore-client.desktop"
+    mkdir -p "$(dirname "$OPENSTORE_DESKTOP")"
+    if [ ! -f "$OPENSTORE_DESKTOP" ] && [ -f /usr/share/applications/openstore-client.desktop ]; then
+        cp /usr/share/applications/openstore-client.desktop "$OPENSTORE_DESKTOP"
+    fi
+
+    log "OpenStore client configured"
+    log "Recommended apps available on OpenStore:"
+    log "  - lomiri-calendar-app (カレンダー)"
+    log "  - lomiri-gallery-app (ギャラリー)"
+    log "  - lomiri-music-app (音楽)"
+    log "  - lomiri-notes-app (メモ)"
+    log "  - lomiri-weather-app (天気)"
+    log "  - lomiri-terminal-app (ターミナル)"
+    log "  - lomiri-docviewer-app (ドキュメント)"
+    log "  - lomiri-mediaplayer-app (メディアプレイヤー)"
+    log "  - lomiri-printing-app (印刷)"
+else
+    log "WARN: openstore-client not found — click apps unavailable"
+fi
+
 # Enable SSH
 if [ -f /etc/ssh/sshd_config ]; then
     systemctl enable ssh 2>/dev/null || true

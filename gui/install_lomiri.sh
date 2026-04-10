@@ -162,31 +162,35 @@ apt-get install -y --no-install-recommends \
 success "Lomiri shell & core services installed"
 
 # ---------------------------------------------------------------------------
-# Install UBports core applications
+# Install UBports core applications (essential apps only — others via OpenStore)
 # ---------------------------------------------------------------------------
 info "Installing UBports core applications..."
 
 apt-get install -y --no-install-recommends \
     morph-browser \
     lomiri-calculator-app \
-    lomiri-calendar-app \
     lomiri-camera-app \
     lomiri-clock-app \
-    lomiri-docviewer-app \
     lomiri-filemanager-app \
-    lomiri-gallery-app \
-    lomiri-music-app \
-    lomiri-notes-app \
-    lomiri-terminal-app \
-    lomiri-weather-app \
     lomiri-dialer-app \
     lomiri-messaging-app \
     lomiri-addressbook-app \
-    lomiri-mediaplayer-app \
-    lomiri-printing-app \
     2>/dev/null || info "Some UBports apps unavailable — continuing"
 
 success "UBports core applications installed"
+
+# ---------------------------------------------------------------------------
+# Install OpenStore client (click package manager for additional apps)
+# ---------------------------------------------------------------------------
+info "Installing OpenStore client..."
+
+apt-get install -y --no-install-recommends \
+    openstore-client \
+    2>/dev/null || info "OpenStore client unavailable — users can install manually"
+
+success "OpenStore client installed"
+info "Additional apps available from OpenStore:"
+info "  calendar, gallery, music, notes, weather, terminal, docviewer, mediaplayer, printing"
 
 # ---------------------------------------------------------------------------
 # Install supporting packages
@@ -194,11 +198,9 @@ success "UBports core applications installed"
 info "Installing supporting packages..."
 
 apt-get install -y --no-install-recommends \
-    onboard \
     zenity \
     fonts-ubuntu \
     fonts-noto \
-    adwaita-icon-theme \
     dbus-x11 \
     2>/dev/null || true
 

@@ -208,28 +208,28 @@ ubuntu-touch-settings
 ubuntu-touch-meta
 
 # ---------------------------------------------------------------------------
-# UBports Apps — Core Applications
+# UBports Apps — Core Applications (essential, pre-installed as deb)
 # https://gitlab.com/ubports/development/apps
 # ---------------------------------------------------------------------------
 morph-browser
 lomiri-calculator-app
-lomiri-calendar-app
 lomiri-camera-app
 lomiri-clock-app
-lomiri-docviewer-app
 lomiri-filemanager-app
-lomiri-gallery-app
-lomiri-music-app
-lomiri-notes-app
-lomiri-terminal-app
-lomiri-weather-app
 
 # UBports Core — Communication apps
 lomiri-dialer-app
 lomiri-messaging-app
 lomiri-addressbook-app
-lomiri-mediaplayer-app
-lomiri-printing-app
+
+# ---------------------------------------------------------------------------
+# OpenStore — Click package manager
+# Non-essential apps are installed from OpenStore at runtime:
+#   lomiri-calendar-app, lomiri-docviewer-app, lomiri-gallery-app,
+#   lomiri-music-app, lomiri-notes-app, lomiri-terminal-app,
+#   lomiri-weather-app, lomiri-mediaplayer-app, lomiri-printing-app
+# ---------------------------------------------------------------------------
+openstore-client
 
 # Setup wizard & fonts
 zenity
