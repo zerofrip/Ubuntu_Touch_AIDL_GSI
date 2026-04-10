@@ -915,6 +915,51 @@ if command -v gsettings >/dev/null 2>&1; then
 fi
 log "Sound profile indicator configured"
 
+# ---------------------------------------------------------------------------
+# 4p. Firefox Mobile Touch Configuration
+# ---------------------------------------------------------------------------
+log "Configuring Firefox for mobile/touch UI"
+
+FIREFOX_PROFILE_DIR="/home/ubuntu/.mozilla/firefox"
+if command -v firefox >/dev/null 2>&1; then
+    mkdir -p "$FIREFOX_PROFILE_DIR/gsi.default"
+
+    # Create profile ini
+    cat > "$FIREFOX_PROFILE_DIR/profiles.ini" <<'FFPEOF'
+[General]
+StartWithLastProfile=1
+
+[Profile0]
+Name=default
+IsRelative=1
+Path=gsi.default
+Default=1
+FFPEOF
+
+    # Mobile-friendly prefs: touch events, compact UI, mobile UA
+    cat > "$FIREFOX_PROFILE_DIR/gsi.default/user.js" <<'FFEOF'
+// Ubuntu GSI — Firefox Mobile/Touch Configuration
+user_pref("dom.w3c_touch_events.enabled", 1);
+user_pref("ui.touch.enabled", true);
+user_pref("apz.allow_zooming", true);
+user_pref("browser.gesture.pinch.in", "cmd_fullZoomReduce");
+user_pref("browser.gesture.pinch.out", "cmd_fullZoomEnlarge");
+user_pref("browser.chrome.dynamictoolbar", true);
+user_pref("browser.display.show_image_placeholders", true);
+user_pref("browser.tabs.drawInTitlebar", true);
+user_pref("browser.uidensity", 2);
+user_pref("browser.toolbars.bookmarks.visibility", "never");
+user_pref("general.useragent.override", "Mozilla/5.0 (Linux; Android 14; Mobile) Gecko/128.0 Firefox/128.0");
+user_pref("devtools.responsive.touchSimulation.enabled", true);
+user_pref("layout.css.devPixelsPerPx", "-1.0");
+user_pref("browser.sessionstore.resume_from_crash", false);
+user_pref("toolkit.cosmeticAnimations.enabled", false);
+FFEOF
+
+    chown -R ubuntu:ubuntu "$FIREFOX_PROFILE_DIR"
+    log "Firefox mobile touch profile created"
+fi
+
 # Enable SSH
 if [ -f /etc/ssh/sshd_config ]; then
     systemctl enable ssh 2>/dev/null || true
