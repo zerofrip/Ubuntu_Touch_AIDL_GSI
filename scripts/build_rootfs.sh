@@ -120,7 +120,22 @@ deb $MIRROR ${SUITE}-updates main restricted universe multiverse
 deb $MIRROR ${SUITE}-security main restricted universe multiverse
 EOF
 
-success "apt sources configured"
+# Add UBports PPA for Lomiri / Ubuntu Touch packages
+info "Adding UBports PPA for Lomiri components"
+mkdir -p "$TARGET_DIR/etc/apt/sources.list.d"
+cat > "$TARGET_DIR/etc/apt/sources.list.d/ubports.list" << 'UBEOF'
+deb http://repo.ubports.com/ focal main
+UBEOF
+
+# Import UBports GPG key (will be fetched during chroot apt-get update)
+mkdir -p "$TARGET_DIR/etc/apt/trusted.gpg.d"
+if command -v wget >/dev/null 2>&1; then
+    wget -qO "$TARGET_DIR/etc/apt/trusted.gpg.d/ubports.gpg" \
+        "http://repo.ubports.com/keyring/keyring.gpg" 2>/dev/null || \
+        info "WARNING: Could not fetch UBports GPG key — packages may fail to verify"
+fi
+
+success "apt sources configured (including UBports PPA)"
 echo ""
 
 # ---------------------------------------------------------------------------

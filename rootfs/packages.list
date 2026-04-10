@@ -45,11 +45,10 @@ usb-modeswitch
 usb-modeswitch-data
 
 # Phone / Dialer / SMS
-gnome-calls
-chatty
-mmsd-tng
-libfeedback0
-feedbackd
+# gnome-calls → lomiri-dialer-app で代替
+# chatty → lomiri-messaging-app で代替
+# mmsd-tng → nuntium で代替
+# feedbackd/libfeedback0 → hfd-service で代替
 
 # Input / Touchscreen
 libinput10
@@ -76,7 +75,7 @@ iio-sensor-proxy
 # GPS / GNSS
 gpsd
 gpsd-clients
-geoclue-2.0
+# geoclue-2.0 → lomiri-location-service で代替
 
 # Bluetooth
 bluez
@@ -91,7 +90,7 @@ gstreamer1.0-libcamera
 gstreamer1.0-plugins-base
 gstreamer1.0-plugins-good
 v4l-utils
-megapixels
+# megapixels → lomiri-camera-app で代替
 
 # Power
 upower
@@ -116,25 +115,132 @@ libgl1-mesa-dri
 mesa-utils
 libwayland-client0
 libwayland-server0
+
+# ---------------------------------------------------------------------------
+# UBports Core — Compositor & Shell
+# https://gitlab.com/ubports/development/core
+# ---------------------------------------------------------------------------
 lomiri
-lomiri-system-settings
+lomiri-session
+lomiri-system-compositor
+lomiri-schemas
+lomiri-sounds
+lomiri-wallpapers
+lomiri-api
+lomiri-ui-toolkit
+lomiri-ui-extras
+lomiri-settings-components
+lomiri-notifications
+lomiri-polkit-agent
+
+# UBports Core — Indicators
 lomiri-indicator-network
 lomiri-indicator-datetime
 lomiri-indicator-session
 lomiri-indicator-power
 lomiri-indicator-sound
 lomiri-indicator-messages
-morph-browser
-lomiri-filemanager-app
-lomiri-calculator-app
-lomiri-clock-app
+lomiri-indicator-location
+lomiri-indicator-transfer
 
-# On-screen keyboard & setup wizard
-onboard
+# UBports Core — System Settings panels
+lomiri-system-settings
+lomiri-system-settings-accessibility
+lomiri-system-settings-cellular
+lomiri-system-settings-phone
+lomiri-system-settings-security-privacy
+lomiri-system-settings-system-update
+lomiri-system-settings-online-accounts
+
+# UBports Core — Services & Daemons
+lomiri-app-launch
+lomiri-url-dispatcher
+lomiri-content-hub
+lomiri-download-manager
+lomiri-push-client
+lomiri-thumbnailer
+lomiri-action-api
+lomiri-location-service
+lomiri-online-accounts
+lomiri-online-accounts-plugins
+lomiri-address-book-service
+lomiri-telephony-service
+lomiri-history-service
+lomiri-storage-framework
+lomiri-sync-monitor
+lomiri-account-polld
+
+# UBports Core — Input
+lomiri-keyboard
+
+# UBports Core — Hardware services
+repowerd
+hfd-service
+media-hub
+mediascanner2
+deviceinfo
+ciborium
+nuntium
+tone-generator
+timekeeper
+mtp
+keeper
+biometryd
+trust-store
+aethercast
+
+# UBports Core — Telephony backend
+telepathy-ofono
+
+# UBports Core — Click packages & AppArmor
+click
+click-apparmor
+apparmor-easyprof-ubuntu
+
+# UBports Core — Qt integration
+gsettings-qt
+u1db-qt
+qqc2-suru-style
+qtmir
+platform-api
+xdg-desktop-portal-lomiri
+
+# UBports Core — Theming & artwork
+suru-icon-theme
+ubuntu-touch-session
+ubuntu-touch-settings
+ubuntu-touch-meta
+
+# ---------------------------------------------------------------------------
+# UBports Apps — Core Applications
+# https://gitlab.com/ubports/development/apps
+# ---------------------------------------------------------------------------
+morph-browser
+lomiri-calculator-app
+lomiri-calendar-app
+lomiri-camera-app
+lomiri-clock-app
+lomiri-docviewer-app
+lomiri-filemanager-app
+lomiri-gallery-app
+lomiri-music-app
+lomiri-notes-app
+lomiri-terminal-app
+lomiri-weather-app
+
+# UBports Core — Communication apps
+lomiri-dialer-app
+lomiri-messaging-app
+lomiri-addressbook-app
+lomiri-mediaplayer-app
+lomiri-printing-app
+
+# Setup wizard & fonts
+# onboard → lomiri-keyboard で代替
 zenity
 fonts-ubuntu
 fonts-noto
-adwaita-icon-theme
+# adwaita-icon-theme → suru-icon-theme で代替
 dbus-x11
 nano
 less

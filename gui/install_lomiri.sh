@@ -77,11 +77,77 @@ info "Installing Lomiri shell..."
 
 apt-get install -y --no-install-recommends \
     lomiri \
+    lomiri-session \
+    lomiri-system-compositor \
     lomiri-system-settings \
+    lomiri-schemas \
+    lomiri-sounds \
+    lomiri-wallpapers \
+    lomiri-api \
+    lomiri-ui-toolkit \
+    lomiri-ui-extras \
+    lomiri-settings-components \
+    lomiri-notifications \
+    lomiri-polkit-agent \
     lomiri-indicator-network \
     lomiri-indicator-datetime \
     lomiri-indicator-session \
     lomiri-indicator-power \
+    lomiri-indicator-sound \
+    lomiri-indicator-messages \
+    lomiri-indicator-location \
+    lomiri-indicator-transfer \
+    lomiri-system-settings-accessibility \
+    lomiri-system-settings-cellular \
+    lomiri-system-settings-phone \
+    lomiri-system-settings-security-privacy \
+    lomiri-system-settings-system-update \
+    lomiri-system-settings-online-accounts \
+    lomiri-app-launch \
+    lomiri-url-dispatcher \
+    lomiri-content-hub \
+    lomiri-download-manager \
+    lomiri-push-client \
+    lomiri-thumbnailer \
+    lomiri-action-api \
+    lomiri-location-service \
+    lomiri-online-accounts \
+    lomiri-online-accounts-plugins \
+    lomiri-address-book-service \
+    lomiri-telephony-service \
+    lomiri-history-service \
+    lomiri-storage-framework \
+    lomiri-sync-monitor \
+    lomiri-account-polld \
+    lomiri-keyboard \
+    repowerd \
+    hfd-service \
+    media-hub \
+    mediascanner2 \
+    deviceinfo \
+    ciborium \
+    nuntium \
+    tone-generator \
+    timekeeper \
+    mtp \
+    keeper \
+    biometryd \
+    trust-store \
+    aethercast \
+    telepathy-ofono \
+    click \
+    click-apparmor \
+    apparmor-easyprof-ubuntu \
+    gsettings-qt \
+    u1db-qt \
+    qqc2-suru-style \
+    qtmir \
+    platform-api \
+    xdg-desktop-portal-lomiri \
+    suru-icon-theme \
+    ubuntu-touch-session \
+    ubuntu-touch-settings \
+    ubuntu-touch-meta \
     2>/dev/null || {
     info "Some Lomiri packages unavailable — installing core only"
     apt-get install -y --no-install-recommends \
@@ -93,7 +159,34 @@ apt-get install -y --no-install-recommends \
     }
 }
 
-success "Lomiri shell installed"
+success "Lomiri shell & core services installed"
+
+# ---------------------------------------------------------------------------
+# Install UBports core applications
+# ---------------------------------------------------------------------------
+info "Installing UBports core applications..."
+
+apt-get install -y --no-install-recommends \
+    morph-browser \
+    lomiri-calculator-app \
+    lomiri-calendar-app \
+    lomiri-camera-app \
+    lomiri-clock-app \
+    lomiri-docviewer-app \
+    lomiri-filemanager-app \
+    lomiri-gallery-app \
+    lomiri-music-app \
+    lomiri-notes-app \
+    lomiri-terminal-app \
+    lomiri-weather-app \
+    lomiri-dialer-app \
+    lomiri-messaging-app \
+    lomiri-addressbook-app \
+    lomiri-mediaplayer-app \
+    lomiri-printing-app \
+    2>/dev/null || info "Some UBports apps unavailable — continuing"
+
+success "UBports core applications installed"
 
 # ---------------------------------------------------------------------------
 # Install supporting packages
