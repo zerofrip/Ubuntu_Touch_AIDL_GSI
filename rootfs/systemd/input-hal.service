@@ -1,0 +1,22 @@
+[Unit]
+Description=Ubuntu GSI Input HAL — Touchscreen/Input Bridge
+Documentation=https://github.com/zerofrip/Ubuntu_Touch_GSI
+After=binder-bridge.service systemd-udevd.service
+Wants=binder-bridge.service
+Before=lomiri.service
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/ubuntu-gsi/aidl/input/input_hal.sh
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=30
+
+# Security hardening
+ProtectSystem=strict
+ReadWritePaths=/data /run/ubuntu-gsi /tmp /dev/input /etc/libinput
+NoNewPrivileges=false
+PrivateTmp=no
+
+[Install]
+WantedBy=graphical.target

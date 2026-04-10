@@ -20,7 +20,7 @@ A production-grade Ubuntu Touch distribution that runs natively on Android Trebl
 ├─────────────────────────────────────────────┤
 │      AIDL HAL Wrappers (no HIDL)            │
 │  power · audio · camera · sensors · gpu     │
-│  wifi · telephony/SIM                       │
+│  wifi · telephony/SIM · input/touchscreen   │
 ├─────────────────────────────────────────────┤
 │    /dev/binder ←→ Android Vendor HALs       │
 ├─────────────────────────────────────────────┤

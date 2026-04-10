@@ -56,6 +56,14 @@
       "critical": false,
       "start_delay": 3,
       "description": "Telephony/SIM via oFono/ModemManager to vendor radio HAL"
+    },
+    {
+      "name": "input",
+      "aidl_interface": "android.hardware.input.IInputProcessor",
+      "binary": "/system/aidl/input/input_hal.sh",
+      "critical": false,
+      "start_delay": 0,
+      "description": "Touchscreen/input via libinput to vendor input drivers"
     }
   ]
 }

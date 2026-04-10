@@ -1,0 +1,72 @@
+# =============================================================================
+# 70-ubuntu-gsi-input.rules — udev Rules for Android Vendor Touchscreen/Input
+# =============================================================================
+# Ensures Android vendor touchscreen and input devices are accessible
+# to the ubuntu user and libinput within the Ubuntu GSI environment.
+#
+# Android touchscreen drivers expose /dev/input/event* nodes. These rules
+# set correct permissions and tags so libinput can manage them.
+# =============================================================================
+
+# --- Generic input device permissions ---
+# All input event devices: readable by input group
+KERNEL=="event*", SUBSYSTEM=="input", MODE="0660", GROUP="input"
+
+# --- Touchscreen identification ---
+# Tag devices that report ABS_MT_POSITION_X (multitouch) as touchscreens
+KERNEL=="event*", SUBSYSTEM=="input", ENV{ID_INPUT_TOUCHSCREEN}=="1", TAG+="uaccess", ENV{LIBINPUT_DEVICE_GROUP}="touchscreen"
+
+# --- Common Android vendor touchscreen drivers ---
+# Goodix (GT9xx, GT5xx)
+KERNEL=="event*", SUBSYSTEM=="input", ATTRS{name}=="goodix*", ENV{ID_INPUT_TOUCHSCREEN}="1", TAG+="uaccess"
+KERNEL=="event*", SUBSYSTEM=="input", ATTRS{name}=="Goodix*", ENV{ID_INPUT_TOUCHSCREEN}="1", TAG+="uaccess"
+KERNEL=="event*", SUBSYSTEM=="input", ATTRS{name}=="GDIX*", ENV{ID_INPUT_TOUCHSCREEN}="1", TAG+="uaccess"
+
+# FocalTech (FT5x, FT8xxx)
+KERNEL=="event*", SUBSYSTEM=="input", ATTRS{name}=="focaltech*", ENV{ID_INPUT_TOUCHSCREEN}="1", TAG+="uaccess"
+KERNEL=="event*", SUBSYSTEM=="input", ATTRS{name}=="fts_ts*", ENV{ID_INPUT_TOUCHSCREEN}="1", TAG+="uaccess"
+
+# Novatek (NT36xxx, NT525xx)
+KERNEL=="event*", SUBSYSTEM=="input", ATTRS{name}=="NVT*", ENV{ID_INPUT_TOUCHSCREEN}="1", TAG+="uaccess"
+KERNEL=="event*", SUBSYSTEM=="input", ATTRS{name}=="nvt*", ENV{ID_INPUT_TOUCHSCREEN}="1", TAG+="uaccess"
+
+# Himax (HX83xxx)
+KERNEL=="event*", SUBSYSTEM=="input", ATTRS{name}=="himax*", ENV{ID_INPUT_TOUCHSCREEN}="1", TAG+="uaccess"
+
+# Synaptics / DSX
+KERNEL=="event*", SUBSYSTEM=="input", ATTRS{name}=="synaptics*", ENV{ID_INPUT_TOUCHSCREEN}="1", TAG+="uaccess"
+KERNEL=="event*", SUBSYSTEM=="input", ATTRS{name}=="Synaptics*", ENV{ID_INPUT_TOUCHSCREEN}="1", TAG+="uaccess"
+
+# Atmel (mXT)
+KERNEL=="event*", SUBSYSTEM=="input", ATTRS{name}=="atmel*", ENV{ID_INPUT_TOUCHSCREEN}="1", TAG+="uaccess"
+KERNEL=="event*", SUBSYSTEM=="input", ATTRS{name}=="Atmel*", ENV{ID_INPUT_TOUCHSCREEN}="1", TAG+="uaccess"
+
+# Chipone (ICNL9xxx)
+KERNEL=="event*", SUBSYSTEM=="input", ATTRS{name}=="chipone*", ENV{ID_INPUT_TOUCHSCREEN}="1", TAG+="uaccess"
+
+# Ilitek (ILI9xxx, ILI2xxx)
+KERNEL=="event*", SUBSYSTEM=="input", ATTRS{name}=="ilitek*", ENV{ID_INPUT_TOUCHSCREEN}="1", TAG+="uaccess"
+KERNEL=="event*", SUBSYSTEM=="input", ATTRS{name}=="ILITEK*", ENV{ID_INPUT_TOUCHSCREEN}="1", TAG+="uaccess"
+
+# Samsung touchscreen
+KERNEL=="event*", SUBSYSTEM=="input", ATTRS{name}=="sec_touchscreen*", ENV{ID_INPUT_TOUCHSCREEN}="1", TAG+="uaccess"
+
+# Elan
+KERNEL=="event*", SUBSYSTEM=="input", ATTRS{name}=="elan*", ENV{ID_INPUT_TOUCHSCREEN}="1", TAG+="uaccess"
+
+# Raydium
+KERNEL=="event*", SUBSYSTEM=="input", ATTRS{name}=="raydium*", ENV{ID_INPUT_TOUCHSCREEN}="1", TAG+="uaccess"
+
+# MediaTek touch panel
+KERNEL=="event*", SUBSYSTEM=="input", ATTRS{name}=="mtk-tpd*", ENV{ID_INPUT_TOUCHSCREEN}="1", TAG+="uaccess"
+KERNEL=="event*", SUBSYSTEM=="input", ATTRS{name}=="mtk_tpd*", ENV{ID_INPUT_TOUCHSCREEN}="1", TAG+="uaccess"
+
+# Fallback: any device whose name contains "touch" or "Touch"
+KERNEL=="event*", SUBSYSTEM=="input", ATTRS{name}=="*[Tt]ouch*", ENV{ID_INPUT_TOUCHSCREEN}="1", TAG+="uaccess"
+
+# --- Power/volume buttons ---
+KERNEL=="event*", SUBSYSTEM=="input", ATTRS{name}=="*[Pp]ower*", ENV{ID_INPUT_KEY}="1", TAG+="uaccess"
+KERNEL=="event*", SUBSYSTEM=="input", ATTRS{name}=="*[Vv]olume*", ENV{ID_INPUT_KEY}="1", TAG+="uaccess"
+KERNEL=="event*", SUBSYSTEM=="input", ATTRS{name}=="gpio-keys*", ENV{ID_INPUT_KEY}="1", TAG+="uaccess"
+KERNEL=="event*", SUBSYSTEM=="input", ATTRS{name}=="pmic-keys*", ENV{ID_INPUT_KEY}="1", TAG+="uaccess"
+KERNEL=="event*", SUBSYSTEM=="input", ATTRS{name}=="mtk-kpd*", ENV{ID_INPUT_KEY}="1", TAG+="uaccess"

@@ -35,6 +35,14 @@ libmbim-utils
 usb-modeswitch
 usb-modeswitch-data
 
+# Input / Touchscreen
+libinput10
+libinput-bin
+libinput-tools
+libevdev2
+libmtdev1
+evtest
+
 # Binder / IPC support
 libbinder-dev
 

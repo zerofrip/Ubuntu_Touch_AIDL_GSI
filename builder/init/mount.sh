@@ -99,6 +99,13 @@ if [ -d /dev/socket ]; then
     echo "[$(date -Iseconds)] [Master Pivot] Bound /dev/socket for RIL access." >> "$LOG_FILE"
 fi
 
+# Bind-mount /dev/input for touchscreen and input device access
+if [ -d /dev/input ]; then
+    mkdir -p "$MERGED/dev/input"
+    mount --bind /dev/input "$MERGED/dev/input"
+    echo "[$(date -Iseconds)] [Master Pivot] Bound /dev/input for touchscreen/input access." >> "$LOG_FILE"
+fi
+
 # Ensure vendor WiFi firmware is accessible from merged root
 if [ -d /vendor/firmware ]; then
     mkdir -p "$MERGED/vendor/firmware"

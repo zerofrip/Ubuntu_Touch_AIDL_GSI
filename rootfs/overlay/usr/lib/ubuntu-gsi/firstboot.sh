@@ -217,6 +217,40 @@ NMMODEM
 
 log "Telephony subsystem configured"
 
+# ---------------------------------------------------------------------------
+# 4c. Input/Touchscreen setup
+# ---------------------------------------------------------------------------
+log "Configuring input/touchscreen subsystem"
+
+# Ensure input device nodes have correct permissions
+if [ -d /dev/input ]; then
+    for event_dev in /dev/input/event*; do
+        [ -c "$event_dev" ] || continue
+        chmod 0660 "$event_dev" 2>/dev/null || true
+        chgrp input "$event_dev" 2>/dev/null || true
+    done
+    log "Input device permissions set (group=input, mode=0660)"
+fi
+
+# Create libinput quirks for Android vendor touchscreens
+mkdir -p /etc/libinput
+cat > /etc/libinput/90-ubuntu-gsi-touch.quirks << 'QUIRKSEOF'
+[Ubuntu GSI Touchscreen Defaults]
+MatchUdevType=touchscreen
+AttrPalmSizeThreshold=0
+AttrPalmPressureThreshold=0
+AttrThumbPressureThreshold=0
+QUIRKSEOF
+log "libinput touchscreen quirks installed"
+
+# Enable the input HAL service
+if [ -f /etc/systemd/system/input-hal.service ] || [ -f /lib/systemd/system/input-hal.service ]; then
+    systemctl enable input-hal.service 2>/dev/null || true
+    log "Input HAL service enabled"
+fi
+
+log "Input/touchscreen subsystem configured"
+
 # Enable SSH
 if [ -f /etc/ssh/sshd_config ]; then
     systemctl enable ssh 2>/dev/null || true
@@ -228,11 +262,10 @@ fi
 # ---------------------------------------------------------------------------
 log "Masking incompatible systemd units"
 
+# NOTE: systemd-udevd is NOT masked — it is required for input device
+# detection (/dev/input/event* nodes, touchscreen udev rules).
 for unit in \
     systemd-modules-load.service \
-    systemd-udevd.service \
-    systemd-udevd-kernel.socket \
-    systemd-udevd-control.socket \
     modprobe@.service \
     SystemdJournal2Gelf.service \
 ; do

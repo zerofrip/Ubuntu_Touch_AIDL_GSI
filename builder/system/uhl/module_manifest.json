@@ -35,6 +35,12 @@
       "binary": "/system/haf/telephony_daemon.sh",
       "critical": false,
       "delay_after": 3
+    },
+    {
+      "name": "Input Daemon",
+      "binary": "/system/haf/input_daemon.sh",
+      "critical": false,
+      "delay_after": 0
     }
   ]
 }

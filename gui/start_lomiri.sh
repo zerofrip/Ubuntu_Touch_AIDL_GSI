@@ -65,6 +65,32 @@ setup_wayland_env() {
 }
 
 # ---------------------------------------------------------------------------
+# Input / Touchscreen Environment for Mir
+# ---------------------------------------------------------------------------
+setup_input_env() {
+    # Mir uses libinput by default — ensure it can find devices
+    export MIR_SERVER_CONSOLE_PROVIDER=auto
+
+    # libinput requires /dev/input access — verify
+    if [ -d /dev/input ]; then
+        local ts_count=0
+        for event_dev in /dev/input/event*; do
+            [ -c "$event_dev" ] || continue
+            ts_count=$((ts_count + 1))
+        done
+        log "Input: $ts_count event device(s) available"
+    else
+        log "WARNING: /dev/input not available — touch input may not work"
+    fi
+
+    # Set LIBINPUT_QUIRKS_DIR for Android vendor touchscreen quirks
+    if [ -d /etc/libinput ]; then
+        export LIBINPUT_QUIRKS_DIR=/etc/libinput
+        log "Input: libinput quirks dir set"
+    fi
+}
+
+# ---------------------------------------------------------------------------
 # D-Bus Session Bus
 # ---------------------------------------------------------------------------
 setup_dbus() {
@@ -81,6 +107,7 @@ setup_dbus() {
 # ---------------------------------------------------------------------------
 setup_gpu_env
 setup_wayland_env
+setup_input_env
 
 case "${1:-}" in
     --setup)
