@@ -26,6 +26,15 @@ crda
 wireless-regdb
 rfkill
 
+# VPN
+openvpn
+network-manager-openvpn
+wireguard-tools
+network-manager-vpnc
+
+# WiFi Tethering
+hostapd
+
 # Telephony / Modem
 ofono
 ofono-scripts
@@ -87,9 +96,13 @@ megapixels
 # Power
 upower
 
+# Storage
+udisks2
+
 # Utilities
 jq
 curl
+grim
 
 # GUI / Display
 mir-graphics-drivers-desktop
@@ -109,6 +122,12 @@ lomiri-indicator-network
 lomiri-indicator-datetime
 lomiri-indicator-session
 lomiri-indicator-power
+lomiri-indicator-sound
+lomiri-indicator-messages
+morph-browser
+lomiri-filemanager-app
+lomiri-calculator-app
+lomiri-clock-app
 
 # On-screen keyboard & setup wizard
 onboard

@@ -271,6 +271,31 @@ if [ -d /sys/class/leds ]; then
     echo "[$(date -Iseconds)] [Master Pivot] Bound /sys/class/leds for vibrator/LEDs." >> "$LOG_FILE"
 fi
 
+# Bind-mount /sys/class/backlight for screen brightness control
+if [ -d /sys/class/backlight ]; then
+    mkdir -p "$MERGED/sys/class/backlight"
+    mount --bind /sys/class/backlight "$MERGED/sys/class/backlight"
+    echo "[$(date -Iseconds)] [Master Pivot] Bound /sys/class/backlight for brightness." >> "$LOG_FILE"
+fi
+
+# Bind-mount SD card (external MMC) block devices
+for mmcblk in /dev/mmcblk1 /dev/mmcblk1p*; do
+    if [ -b "$mmcblk" ]; then
+        mmcblk_name=$(basename "$mmcblk")
+        touch "$MERGED/dev/$mmcblk_name" 2>/dev/null || true
+        mount --bind "$mmcblk" "$MERGED/dev/$mmcblk_name"
+    fi
+done
+if [ -b /dev/mmcblk1 ]; then
+    echo "[$(date -Iseconds)] [Master Pivot] Bound SD card block devices." >> "$LOG_FILE"
+fi
+
+# Bind-mount /sys/class/mmc_host for MMC/SD detection
+if [ -d /sys/class/mmc_host ]; then
+    mkdir -p "$MERGED/sys/class/mmc_host"
+    mount --bind /sys/class/mmc_host "$MERGED/sys/class/mmc_host"
+fi
+
 if [ ! -x "$MERGED/lib/systemd/systemd" ]; then
      echo "[$(date -Iseconds)] [Master Pivot] FATAL: Pivot execution aborted. Systemd target corrupted." >> "$LOG_FILE"
      exit 1

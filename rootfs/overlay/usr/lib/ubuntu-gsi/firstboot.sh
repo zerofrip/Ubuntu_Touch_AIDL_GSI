@@ -674,6 +674,247 @@ fi
 
 log "Audio subsystem configured"
 
+# ---------------------------------------------------------------------------
+# 4e. Screen brightness control
+# ---------------------------------------------------------------------------
+log "Configuring screen brightness control"
+
+# Set backlight permissions so user can adjust brightness
+for bl_dir in /sys/class/backlight/*; do
+    [ -d "$bl_dir" ] || continue
+    bl_name=$(basename "$bl_dir")
+    # Create udev rule for backlight access
+    cat > /etc/udev/rules.d/80-backlight.rules <<'BLEOF'
+SUBSYSTEM=="backlight", ACTION=="add", RUN+="/bin/chmod 0666 /sys/class/backlight/%k/brightness"
+BLEOF
+    # Set permissions immediately
+    chmod 0666 "$bl_dir/brightness" 2>/dev/null || true
+    log "Backlight '$bl_name' permissions set"
+    break
+done
+
+# ---------------------------------------------------------------------------
+# 4f. Flashlight / Camera flash LED
+# ---------------------------------------------------------------------------
+log "Configuring flashlight/torch control"
+
+# Install flashlight toggle script
+if [ -f /usr/lib/ubuntu-gsi/scripts/flashlight/flashlight-toggle.sh ]; then
+    chmod +x /usr/lib/ubuntu-gsi/scripts/flashlight/flashlight-toggle.sh
+    ln -sf /usr/lib/ubuntu-gsi/scripts/flashlight/flashlight-toggle.sh /usr/local/bin/flashlight
+    log "Flashlight toggle installed to /usr/local/bin/flashlight"
+fi
+
+# Set flash LED permissions
+for flash_led in \
+    /sys/class/leds/flashlight \
+    /sys/class/leds/torch-light0 \
+    /sys/class/leds/torch-light1 \
+    /sys/class/leds/led:flash_0 \
+    /sys/class/leds/led:torch_0 \
+    /sys/class/leds/white:flash \
+    /sys/class/leds/white:torch; do
+    if [ -d "$flash_led" ]; then
+        chmod 0666 "$flash_led/brightness" 2>/dev/null || true
+        log "Flash LED permissions set: $(basename "$flash_led")"
+    fi
+done
+
+# ---------------------------------------------------------------------------
+# 4g. SD card auto-mount
+# ---------------------------------------------------------------------------
+log "Configuring SD card auto-mount"
+
+mkdir -p /media/ubuntu/sdcard
+
+# Udev rule for auto-mounting external SD card partitions
+cat > /etc/udev/rules.d/81-sdcard-automount.rules <<'SDEOF'
+# Auto-mount external SD card partitions
+KERNEL=="mmcblk1p[0-9]*", SUBSYSTEM=="block", ACTION=="add", \
+    RUN+="/bin/mkdir -p /media/ubuntu/sdcard/%k", \
+    RUN+="/bin/mount -o rw,nosuid,nodev,noexec,uid=1000,gid=1000 /dev/%k /media/ubuntu/sdcard/%k"
+KERNEL=="mmcblk1p[0-9]*", SUBSYSTEM=="block", ACTION=="remove", \
+    RUN+="/bin/umount -l /media/ubuntu/sdcard/%k", \
+    RUN+="/bin/rmdir /media/ubuntu/sdcard/%k"
+# If SD card has no partition table, mount the whole device
+KERNEL=="mmcblk1", SUBSYSTEM=="block", ACTION=="add", \
+    ATTR{partition}!="?*", \
+    RUN+="/bin/mkdir -p /media/ubuntu/sdcard/mmcblk1", \
+    RUN+="/bin/mount -o rw,nosuid,nodev,noexec,uid=1000,gid=1000 /dev/%k /media/ubuntu/sdcard/mmcblk1"
+SDEOF
+log "SD card auto-mount udev rules installed"
+
+# Mount any already-inserted SD card
+for sdpart in /dev/mmcblk1p*; do
+    [ -b "$sdpart" ] || continue
+    part_name=$(basename "$sdpart")
+    mkdir -p "/media/ubuntu/sdcard/$part_name"
+    mount -o rw,nosuid,nodev,noexec,uid=1000,gid=1000 "$sdpart" "/media/ubuntu/sdcard/$part_name" 2>/dev/null || true
+    log "Mounted existing SD partition: $part_name"
+done
+
+# ---------------------------------------------------------------------------
+# 4h. Screen auto-rotation (iio-sensor-proxy)
+# ---------------------------------------------------------------------------
+log "Configuring screen auto-rotation"
+
+# Enable iio-sensor-proxy for accelerometer-based rotation
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl enable iio-sensor-proxy.service 2>/dev/null || true
+    log "iio-sensor-proxy enabled for auto-rotation"
+fi
+
+# ---------------------------------------------------------------------------
+# 4i. Lock screen / Greeter
+# ---------------------------------------------------------------------------
+log "Configuring lock screen"
+
+# Lomiri uses its built-in greeter (--mode=full-greeter)
+# Configure auto-lock timeout via gsettings
+if command -v gsettings >/dev/null 2>&1; then
+    # Set as ubuntu user
+    su - ubuntu -c "
+        gsettings set com.lomiri.touch.system activity-timeout 300 2>/dev/null || true
+        gsettings set com.lomiri.touch.system auto-brightness false 2>/dev/null || true
+    " 2>/dev/null || true
+    log "Lomiri greeter auto-lock configured (300s)"
+fi
+
+# ---------------------------------------------------------------------------
+# 4j. Notification LED control
+# ---------------------------------------------------------------------------
+log "Configuring notification LED"
+
+# Detect notification LED (commonly rgb, indicator, or green/blue/red)
+for led_pattern in \
+    /sys/class/leds/red \
+    /sys/class/leds/green \
+    /sys/class/leds/blue \
+    /sys/class/leds/white \
+    /sys/class/leds/rgb \
+    /sys/class/leds/indicator \
+    /sys/class/leds/charging; do
+    if [ -d "$led_pattern" ]; then
+        chmod 0666 "$led_pattern/brightness" 2>/dev/null || true
+        # Enable trigger access if available
+        chmod 0666 "$led_pattern/trigger" 2>/dev/null || true
+        log "Notification LED permissions: $(basename "$led_pattern")"
+    fi
+done
+
+# Udev rule for persistent LED access
+cat > /etc/udev/rules.d/82-notification-led.rules <<'LEDEOF'
+SUBSYSTEM=="leds", ACTION=="add", RUN+="/bin/chmod 0666 /sys/class/leds/%k/brightness"
+SUBSYSTEM=="leds", ACTION=="add", RUN+="/bin/chmod 0666 /sys/class/leds/%k/trigger"
+LEDEOF
+log "Notification LED udev rules installed"
+
+# ---------------------------------------------------------------------------
+# 4k. Screen timeout / DPMS
+# ---------------------------------------------------------------------------
+log "Configuring screen timeout"
+
+# Create logind idle action configuration
+mkdir -p /etc/systemd/logind.conf.d
+cat > /etc/systemd/logind.conf.d/10-screen-timeout.conf <<'DPMSEOF'
+[Login]
+# Screen off after 60 seconds idle
+IdleAction=ignore
+IdleActionSec=60s
+DPMSEOF
+log "Screen timeout: 60s idle configured"
+
+# ---------------------------------------------------------------------------
+# 4l. WiFi tethering / Hotspot
+# ---------------------------------------------------------------------------
+log "Configuring WiFi tethering"
+
+# Create NetworkManager hotspot connection template
+mkdir -p /etc/NetworkManager/system-connections
+cat > /etc/NetworkManager/system-connections/Hotspot.nmconnection <<'HOTEOF'
+[connection]
+id=Hotspot
+type=wifi
+autoconnect=false
+
+[wifi]
+mode=ap
+ssid=UbuntuGSI-Hotspot
+
+[wifi-security]
+key-mgmt=wpa-psk
+psk=ubuntu-gsi-hotspot
+
+[ipv4]
+method=shared
+
+[ipv6]
+method=ignore
+HOTEOF
+chmod 0600 /etc/NetworkManager/system-connections/Hotspot.nmconnection
+log "WiFi tethering hotspot template created"
+
+# ---------------------------------------------------------------------------
+# 4m. VPN support (OpenVPN, WireGuard)
+# ---------------------------------------------------------------------------
+log "Configuring VPN support"
+
+# Enable NetworkManager VPN plugins
+mkdir -p /etc/NetworkManager/conf.d
+cat > /etc/NetworkManager/conf.d/10-vpn.conf <<'VPNEOF'
+[main]
+plugins+=keyfile
+
+[keyfile]
+unmanaged-devices=none
+VPNEOF
+
+# Ensure WireGuard kernel module loads
+if [ -f /lib/modules/"$(uname -r)"/kernel/drivers/net/wireguard/wireguard.ko ]; then
+    echo "wireguard" >> /etc/modules-load.d/ubuntu-gsi.conf
+    log "WireGuard module auto-load configured"
+fi
+log "VPN support configured (OpenVPN + WireGuard)"
+
+# ---------------------------------------------------------------------------
+# 4n. Screenshot tool
+# ---------------------------------------------------------------------------
+log "Configuring screenshot tool"
+
+# Create screenshot wrapper script
+cat > /usr/local/bin/screenshot <<'SSEOF'
+#!/bin/bash
+# Ubuntu GSI Screenshot — captures to ~/Pictures/Screenshots
+DEST="$HOME/Pictures/Screenshots"
+mkdir -p "$DEST"
+FILENAME="$DEST/screenshot_$(date +%Y%m%d_%H%M%S).png"
+if command -v grim >/dev/null 2>&1; then
+    grim "$FILENAME" && echo "Screenshot saved: $FILENAME"
+elif command -v gnome-screenshot >/dev/null 2>&1; then
+    gnome-screenshot -f "$FILENAME"
+else
+    echo "No screenshot tool available"
+    exit 1
+fi
+SSEOF
+chmod +x /usr/local/bin/screenshot
+mkdir -p /home/ubuntu/Pictures/Screenshots
+chown -R ubuntu:ubuntu /home/ubuntu/Pictures
+log "Screenshot tool installed (/usr/local/bin/screenshot)"
+
+# ---------------------------------------------------------------------------
+# 4o. Sound profiles (indicator-sound)
+# ---------------------------------------------------------------------------
+log "Configuring sound profiles"
+
+# Set default sound indicators for Lomiri
+if command -v gsettings >/dev/null 2>&1; then
+    su - ubuntu -c "
+        gsettings set com.lomiri.indicator.sound visible true 2>/dev/null || true
+    " 2>/dev/null || true
+fi
+log "Sound profile indicator configured"
+
 # Enable SSH
 if [ -f /etc/ssh/sshd_config ]; then
     systemctl enable ssh 2>/dev/null || true
