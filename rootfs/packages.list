@@ -48,6 +48,11 @@ libbinder-dev
 
 # Audio
 pulseaudio
+pulseaudio-utils
+alsa-utils
+alsa-base
+libasound2
+libasound2-plugins
 
 # Sensors
 iio-sensor-proxy

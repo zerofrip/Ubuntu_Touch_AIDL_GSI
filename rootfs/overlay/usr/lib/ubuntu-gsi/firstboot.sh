@@ -251,6 +251,51 @@ fi
 
 log "Input/touchscreen subsystem configured"
 
+# ---------------------------------------------------------------------------
+# 4d. Audio/Speaker setup
+# ---------------------------------------------------------------------------
+log "Configuring audio subsystem"
+
+# Add ubuntu user to audio group (should be set at useradd, but ensure)
+if id -u ubuntu >/dev/null 2>&1; then
+    usermod -aG audio,pulse,pulse-access ubuntu 2>/dev/null || true
+fi
+
+# Unmute ALSA controls on all detected cards
+if command -v amixer >/dev/null 2>&1; then
+    card_num=0
+    while [ -d "/proc/asound/card${card_num}" ]; do
+        for ctl in Master Speaker Headphone PCM; do
+            amixer -c "$card_num" -q set "$ctl" 80% unmute 2>/dev/null || true
+        done
+        log "ALSA card $card_num unmuted"
+        card_num=$((card_num + 1))
+    done
+fi
+
+# Configure PulseAudio for system-wide mode (needed for GSI environment)
+mkdir -p /etc/pulse
+if [ -f /etc/pulse/system.pa ]; then
+    # Ensure ALSA modules are loaded
+    if ! grep -q "module-alsa-card" /etc/pulse/system.pa 2>/dev/null; then
+        cat >> /etc/pulse/system.pa << 'PULSEEOF'
+
+### Ubuntu GSI — Auto-detect ALSA cards
+load-module module-udev-detect
+load-module module-native-protocol-unix auth-anonymous=1
+PULSEEOF
+        log "PulseAudio system.pa updated with ALSA auto-detect"
+    fi
+fi
+
+# Enable volume key daemon
+if [ -f /etc/systemd/system/volume-key-daemon.service ] || [ -f /lib/systemd/system/volume-key-daemon.service ]; then
+    systemctl enable volume-key-daemon.service 2>/dev/null || true
+    log "Volume key daemon enabled"
+fi
+
+log "Audio subsystem configured"
+
 # Enable SSH
 if [ -f /etc/ssh/sshd_config ]; then
     systemctl enable ssh 2>/dev/null || true

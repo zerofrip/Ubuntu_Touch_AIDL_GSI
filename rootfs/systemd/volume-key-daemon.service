@@ -1,0 +1,19 @@
+[Unit]
+Description=Ubuntu GSI Volume Key Daemon
+Documentation=https://github.com/zerofrip/Ubuntu_Touch_GSI
+After=pulseaudio.service input-hal.service
+Wants=pulseaudio.service
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/ubuntu-gsi/scripts/volume-key-daemon.sh
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=30
+
+# Needs input device access and PulseAudio socket
+SupplementaryGroups=input audio
+ReadWritePaths=/data /run /tmp
+
+[Install]
+WantedBy=graphical.target
