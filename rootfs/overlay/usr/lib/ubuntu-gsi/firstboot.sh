@@ -111,6 +111,62 @@ if command -v nmcli >/dev/null 2>&1; then
 fi
 
 # ---------------------------------------------------------------------------
+# 4-gpu. GPU/DRM device permissions
+# ---------------------------------------------------------------------------
+log "Configuring GPU/DRM device permissions"
+
+# Ensure render group exists and ubuntu user belongs to it
+if ! getent group render >/dev/null 2>&1; then
+    groupadd -r render 2>/dev/null || true
+fi
+if id -u ubuntu >/dev/null 2>&1; then
+    usermod -aG render,video ubuntu 2>/dev/null || true
+fi
+
+# Set DRM device permissions
+if [ -d /dev/dri ]; then
+    for dri_dev in /dev/dri/card* /dev/dri/renderD*; do
+        [ -e "$dri_dev" ] || continue
+        chmod 0666 "$dri_dev" 2>/dev/null || true
+    done
+    log "DRM device permissions set"
+fi
+
+# Create udev rule for persistent DRM permissions
+mkdir -p /etc/udev/rules.d
+cat > /etc/udev/rules.d/50-ubuntu-gsi-gpu.rules << 'GPUEOF'
+# DRM render nodes — accessible by render group
+SUBSYSTEM=="drm", KERNEL=="renderD*", MODE="0666"
+SUBSYSTEM=="drm", KERNEL=="card*", MODE="0666"
+
+# Framebuffer
+SUBSYSTEM=="graphics", KERNEL=="fb*", MODE="0666"
+GPUEOF
+log "GPU udev rules installed"
+
+# ---------------------------------------------------------------------------
+# 4-cam. Camera device permissions
+# ---------------------------------------------------------------------------
+log "Configuring camera device permissions"
+
+# Set V4L2 and media controller device permissions
+for cam_dev in /dev/video* /dev/media*; do
+    [ -e "$cam_dev" ] || continue
+    chmod 0666 "$cam_dev" 2>/dev/null || true
+done
+
+# Add camera udev rules for persistent permissions
+cat >> /etc/udev/rules.d/50-ubuntu-gsi-gpu.rules << 'CAMEOF'
+
+# V4L2 camera devices
+SUBSYSTEM=="video4linux", MODE="0666"
+
+# Media controller devices (camera pipelines)
+SUBSYSTEM=="media", MODE="0666"
+CAMEOF
+log "Camera udev rules installed"
+
+# ---------------------------------------------------------------------------
 # 4a. WiFi subsystem setup
 # ---------------------------------------------------------------------------
 log "Configuring WiFi subsystem"

@@ -15,6 +15,56 @@ aidl_hal_init "graphics" "android.hardware.graphics.composer3.IComposer" "critic
 GPU_CACHE="/data/uhl_overlay/gpu_success.cache"
 
 # ---------------------------------------------------------------------------
+# DRM / GPU device preparation
+# ---------------------------------------------------------------------------
+prepare_drm_devices() {
+    # Ensure /dev/dri devices have correct permissions
+    if [ -d /dev/dri ]; then
+        chmod 0666 /dev/dri/card* 2>/dev/null || true
+        chmod 0666 /dev/dri/renderD* 2>/dev/null || true
+        hal_info "DRM devices:"
+        for dri_dev in /dev/dri/*; do
+            [ -e "$dri_dev" ] || continue
+            hal_info "  $dri_dev ($(stat -c '%a' "$dri_dev" 2>/dev/null))"
+        done
+    else
+        hal_warn "/dev/dri not available — no DRM devices"
+    fi
+
+    # Ensure /dev/fb0 has correct permissions (framebuffer fallback)
+    if [ -c /dev/fb0 ]; then
+        chmod 0666 /dev/fb0 2>/dev/null || true
+        hal_info "Framebuffer /dev/fb0 available"
+    fi
+
+    # Ensure /dev/graphics has correct permissions (Android HWC)
+    if [ -d /dev/graphics ]; then
+        chmod 0666 /dev/graphics/fb* 2>/dev/null || true
+        hal_info "Android graphics devices available"
+    fi
+}
+
+symlink_vendor_gpu_libs() {
+    # Symlink vendor GPU libraries into Linux library search paths
+    # so Mesa/libhybris can find them
+    local vendor_dirs="/vendor/lib64/egl /vendor/lib64/hw /vendor/lib64"
+
+    for vdir in $vendor_dirs; do
+        [ -d "$vdir" ] || continue
+        for lib in "$vdir"/lib*.so "$vdir"/vulkan.*.so "$vdir"/gralloc.*.so \
+                   "$vdir"/hwcomposer.*.so "$vdir"/libGLES*.so "$vdir"/libEGL*.so; do
+            [ -f "$lib" ] || continue
+            local basename
+            basename=$(basename "$lib")
+            if [ ! -e "/usr/lib/aarch64-linux-gnu/$basename" ]; then
+                ln -sf "$lib" "/usr/lib/aarch64-linux-gnu/$basename" 2>/dev/null || true
+            fi
+        done
+    done
+    hal_info "Vendor GPU libraries symlinked"
+}
+
+# ---------------------------------------------------------------------------
 # GPU Detection
 # ---------------------------------------------------------------------------
 detect_gpu_mode() {
@@ -67,6 +117,11 @@ apply_gpu_env() {
 # Native handler — GPU compositor lifecycle
 # ---------------------------------------------------------------------------
 graphics_native() {
+    # Step 1: Prepare DRM devices and vendor library symlinks
+    prepare_drm_devices
+    symlink_vendor_gpu_libs
+
+    # Step 2: Detect and configure GPU mode
     detect_gpu_mode
     apply_gpu_env
 
@@ -126,6 +181,7 @@ graphics_native() {
 # Mock handler — software-only rendering
 # ---------------------------------------------------------------------------
 graphics_mock() {
+    prepare_drm_devices
     MODE="llvmpipe"
     apply_gpu_env
     graphics_native  # Same logic, just starts in llvmpipe mode

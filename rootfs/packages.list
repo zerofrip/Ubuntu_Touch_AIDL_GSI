@@ -57,6 +57,16 @@ libasound2-plugins
 # Sensors
 iio-sensor-proxy
 
+# Camera
+libcamera0.3
+libcamera-tools
+libcamera-ipa
+gstreamer1.0-libcamera
+gstreamer1.0-plugins-base
+gstreamer1.0-plugins-good
+v4l-utils
+megapixels
+
 # Power
 upower
 
@@ -67,6 +77,15 @@ curl
 # GUI / Display
 mir-graphics-drivers-desktop
 mir-platform-graphics-wayland
+libdrm2
+libdrm-common
+libgbm1
+libegl1-mesa
+libgles2-mesa
+libgl1-mesa-dri
+mesa-utils
+libwayland-client0
+libwayland-server0
 lomiri
 lomiri-system-settings
 lomiri-indicator-network
@@ -85,10 +104,3 @@ nano
 less
 htop
 e2fsprogs
-
-# Display (Mir + Wayland)
-mir-graphics-drivers-desktop
-
-# Fonts (for GUI)
-fonts-ubuntu
-fonts-noto

@@ -106,6 +106,48 @@ if [ -d /dev/input ]; then
     echo "[$(date -Iseconds)] [Master Pivot] Bound /dev/input for touchscreen/input access." >> "$LOG_FILE"
 fi
 
+# Bind-mount /dev/dri for GPU/DRM access (hardware-accelerated rendering)
+if [ -d /dev/dri ]; then
+    mkdir -p "$MERGED/dev/dri"
+    mount --bind /dev/dri "$MERGED/dev/dri"
+    echo "[$(date -Iseconds)] [Master Pivot] Bound /dev/dri for GPU/DRM access." >> "$LOG_FILE"
+fi
+
+# Bind-mount /dev/fb0 for framebuffer fallback (legacy display path)
+if [ -c /dev/fb0 ]; then
+    touch "$MERGED/dev/fb0" 2>/dev/null
+    mount --bind /dev/fb0 "$MERGED/dev/fb0"
+    echo "[$(date -Iseconds)] [Master Pivot] Bound /dev/fb0 for framebuffer access." >> "$LOG_FILE"
+fi
+
+# Bind-mount /dev/graphics for Android HWC/gralloc access
+if [ -d /dev/graphics ]; then
+    mkdir -p "$MERGED/dev/graphics"
+    mount --bind /dev/graphics "$MERGED/dev/graphics"
+    echo "[$(date -Iseconds)] [Master Pivot] Bound /dev/graphics for HWC access." >> "$LOG_FILE"
+fi
+
+# Bind-mount /dev/video* for camera device access (V4L2)
+cam_bound=0
+for cam_dev in /dev/video*; do
+    [ -c "$cam_dev" ] || continue
+    cam_name=$(basename "$cam_dev")
+    touch "$MERGED/dev/$cam_name" 2>/dev/null
+    mount --bind "$cam_dev" "$MERGED/dev/$cam_name"
+    cam_bound=$((cam_bound + 1))
+done
+if [ "$cam_bound" -gt 0 ]; then
+    echo "[$(date -Iseconds)] [Master Pivot] Bound $cam_bound V4L2 camera devices." >> "$LOG_FILE"
+fi
+
+# Bind-mount /dev/media* for media controller access (camera pipelines)
+for media_dev in /dev/media*; do
+    [ -c "$media_dev" ] || continue
+    media_name=$(basename "$media_dev")
+    touch "$MERGED/dev/$media_name" 2>/dev/null
+    mount --bind "$media_dev" "$MERGED/dev/$media_name"
+done
+
 # Ensure vendor WiFi firmware is accessible from merged root
 if [ -d /vendor/firmware ]; then
     mkdir -p "$MERGED/vendor/firmware"

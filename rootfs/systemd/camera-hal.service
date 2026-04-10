@@ -1,0 +1,23 @@
+[Unit]
+Description=Ubuntu GSI Camera HAL — V4L2/libcamera Bridge
+Documentation=https://github.com/zerofrip/Ubuntu_Touch_GSI
+After=binder-bridge.service systemd-udevd.service
+Wants=binder-bridge.service
+ConditionPathExists=/usr/lib/ubuntu-gsi/aidl/camera/camera_hal.sh
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/ubuntu-gsi/aidl/camera/camera_hal.sh
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=30
+Environment=LIBCAMERA_LOG_LEVELS=*:WARN
+
+# Security hardening
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/run/ubuntu-gsi /data/uhl_overlay /dev
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
