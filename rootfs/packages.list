@@ -35,6 +35,13 @@ libmbim-utils
 usb-modeswitch
 usb-modeswitch-data
 
+# Phone / Dialer / SMS
+gnome-calls
+chatty
+mmsd-tng
+libfeedback0
+feedbackd
+
 # Input / Touchscreen
 libinput10
 libinput-bin

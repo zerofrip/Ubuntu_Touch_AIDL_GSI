@@ -99,6 +99,33 @@ if [ -d /dev/socket ]; then
     echo "[$(date -Iseconds)] [Master Pivot] Bound /dev/socket for RIL access." >> "$LOG_FILE"
 fi
 
+# Bind-mount modem/radio device nodes for telephony (QMI, MBIM, MediaTek CCCI)
+modem_bound=0
+for modem_dev in /dev/qmi* /dev/cdc-wdm* /dev/ttyMT* /dev/ccci_* /dev/eemcs_*; do
+    [ -c "$modem_dev" ] || continue
+    modem_name=$(basename "$modem_dev")
+    touch "$MERGED/dev/$modem_name" 2>/dev/null
+    mount --bind "$modem_dev" "$MERGED/dev/$modem_name"
+    modem_bound=$((modem_bound + 1))
+done
+if [ "$modem_bound" -gt 0 ]; then
+    echo "[$(date -Iseconds)] [Master Pivot] Bound $modem_bound modem device(s) for telephony." >> "$LOG_FILE"
+fi
+
+# Bind-mount /dev/smd* for Qualcomm shared memory driver (voice/data)
+for smd_dev in /dev/smd*; do
+    [ -c "$smd_dev" ] || continue
+    smd_name=$(basename "$smd_dev")
+    touch "$MERGED/dev/$smd_name" 2>/dev/null
+    mount --bind "$smd_dev" "$MERGED/dev/$smd_name"
+done
+
+# Bind-mount /sys/class/net for modem network interface visibility
+if [ -d /sys/class/net ]; then
+    mkdir -p "$MERGED/sys/class/net"
+    mount --bind /sys/class/net "$MERGED/sys/class/net"
+fi
+
 # Bind-mount /dev/input for touchscreen and input device access
 if [ -d /dev/input ]; then
     mkdir -p "$MERGED/dev/input"

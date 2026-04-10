@@ -423,6 +423,95 @@ NMMODEM
 log "Telephony subsystem configured"
 
 # ---------------------------------------------------------------------------
+# 4b2. Voice call / SMS application setup
+# ---------------------------------------------------------------------------
+log "Configuring voice call and SMS applications"
+
+# Create modem device udev rules for persistent permissions
+cat > /etc/udev/rules.d/60-ubuntu-gsi-modem.rules << 'MODEMEOF'
+# Qualcomm QMI modem
+SUBSYSTEM=="usb", ATTR{idVendor}=="05c6", MODE="0660", GROUP="dialout"
+KERNEL=="qmi*", MODE="0660", GROUP="dialout"
+KERNEL=="cdc-wdm*", MODE="0660", GROUP="dialout"
+
+# MediaTek CCCI modem
+KERNEL=="ccci_*", MODE="0660", GROUP="dialout"
+KERNEL=="eemcs_*", MODE="0660", GROUP="dialout"
+KERNEL=="ttyMT*", MODE="0660", GROUP="dialout"
+
+# Generic USB modems
+KERNEL=="ttyACM*", MODE="0660", GROUP="dialout"
+KERNEL=="ttyUSB*", MODE="0660", GROUP="dialout"
+
+# Qualcomm SMD (shared memory driver)
+KERNEL=="smd*", MODE="0660", GROUP="dialout"
+MODEMEOF
+log "Modem udev rules installed"
+
+# Setup call history / SMS storage directory
+if id -u ubuntu >/dev/null 2>&1; then
+    mkdir -p /home/ubuntu/.local/share/calls
+    mkdir -p /home/ubuntu/.local/share/chatty
+    chown -R ubuntu:ubuntu /home/ubuntu/.local/share/calls 2>/dev/null || true
+    chown -R ubuntu:ubuntu /home/ubuntu/.local/share/chatty 2>/dev/null || true
+    log "Call history and SMS storage directories created"
+fi
+
+# Configure oFono voice call and SMS plugins
+if [ -d /etc/ofono ]; then
+    cat > /etc/ofono/phonesim.conf << 'OFONOEOF'
+[Settings]
+SetupRequired=false
+OFONOEOF
+    log "oFono configuration written"
+fi
+
+# Enable GNOME Calls autostart for incoming call notifications
+if id -u ubuntu >/dev/null 2>&1; then
+    mkdir -p /home/ubuntu/.config/autostart
+    cat > /home/ubuntu/.config/autostart/gnome-calls.desktop << 'CALLSEOF'
+[Desktop Entry]
+Type=Application
+Name=Phone
+Exec=gnome-calls --daemon
+Hidden=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+CALLSEOF
+    chown -R ubuntu:ubuntu /home/ubuntu/.config/autostart 2>/dev/null || true
+    log "GNOME Calls autostart configured for incoming call notifications"
+fi
+
+# Enable Chatty (SMS) autostart
+if id -u ubuntu >/dev/null 2>&1; then
+    cat > /home/ubuntu/.config/autostart/chatty.desktop << 'CHATTYEOF'
+[Desktop Entry]
+Type=Application
+Name=Messages
+Exec=chatty --daemon
+Hidden=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+CHATTYEOF
+    chown -R ubuntu:ubuntu /home/ubuntu/.config/autostart 2>/dev/null || true
+    log "Chatty SMS autostart configured"
+fi
+
+# Enable feedbackd for call vibration/ringtone notifications
+if systemctl list-unit-files feedbackd.service >/dev/null 2>&1; then
+    systemctl enable feedbackd.service 2>/dev/null || true
+    log "feedbackd.service enabled (haptic/ring notifications)"
+fi
+
+# Enable mmsd-tng for MMS support
+if systemctl list-unit-files mmsd-tng.service >/dev/null 2>&1; then
+    systemctl enable mmsd-tng.service 2>/dev/null || true
+    log "mmsd-tng MMS service enabled"
+fi
+
+log "Voice call and SMS applications configured"
+
+# ---------------------------------------------------------------------------
 # 4c. Input/Touchscreen setup
 # ---------------------------------------------------------------------------
 log "Configuring input/touchscreen subsystem"
@@ -470,10 +559,11 @@ fi
 if command -v amixer >/dev/null 2>&1; then
     card_num=0
     while [ -d "/proc/asound/card${card_num}" ]; do
-        for ctl in Master Speaker Headphone PCM; do
+        for ctl in Master Speaker Headphone PCM Earpiece Receiver \
+                   "Voice Call" Capture "Internal Mic" "Headset Mic"; do
             amixer -c "$card_num" -q set "$ctl" 80% unmute 2>/dev/null || true
         done
-        log "ALSA card $card_num unmuted"
+        log "ALSA card $card_num unmuted (incl. earpiece/voice/mic)"
         card_num=$((card_num + 1))
     done
 fi
