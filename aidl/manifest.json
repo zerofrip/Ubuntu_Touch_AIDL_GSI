@@ -40,6 +40,22 @@
       "critical": true,
       "start_delay": 0,
       "description": "GPU/display via Mir compositor to vendor graphics"
+    },
+    {
+      "name": "wifi",
+      "aidl_interface": "android.hardware.wifi.IWifi",
+      "binary": "/system/aidl/wifi/wifi_hal.sh",
+      "critical": false,
+      "start_delay": 2,
+      "description": "WiFi via wpa_supplicant/NetworkManager to vendor WiFi driver"
+    },
+    {
+      "name": "telephony",
+      "aidl_interface": "android.hardware.radio.IRadio",
+      "binary": "/system/aidl/telephony/telephony_hal.sh",
+      "critical": false,
+      "start_delay": 3,
+      "description": "Telephony/SIM via oFono/ModemManager to vendor radio HAL"
     }
   ]
 }

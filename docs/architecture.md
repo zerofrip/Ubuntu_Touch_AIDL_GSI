@@ -22,6 +22,8 @@ graph TD
     BINDERD --> CAMERA["camera_hal.sh"]
     BINDERD --> SENSORS["sensors_hal.sh"]
     BINDERD --> GRAPHICS["graphics_hal.sh"]
+    BINDERD --> WIFI["wifi_hal.sh"]
+    BINDERD --> TELEPHONY["telephony_hal.sh"]
     LOMIRI --> MIR["Mir Compositor"]
     MIR --> GUI["Ubuntu Touch UI"]
 ```
@@ -35,7 +37,7 @@ graph TD
 | **L2** | Custom init | Mount vendor, BinderFS, pivot to Ubuntu |
 | **L3** | systemd | Service management, graphical target |
 | **L4** | Binder bridge | Orchestrate AIDL HAL wrappers |
-| **L5** | AIDL HAL | Power, audio, camera, sensors, graphics |
+| **L5** | AIDL HAL | Power, audio, camera, sensors, graphics, WiFi, telephony |
 | **L6** | Mir/Wayland | Display compositor |
 | **L7** | Lomiri | Ubuntu Touch shell + apps |
 

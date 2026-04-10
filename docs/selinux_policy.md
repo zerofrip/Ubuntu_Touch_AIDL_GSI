@@ -74,6 +74,9 @@ graph TD
 | `ubuntu_container_t` | `hal_audio_service` | `binder: call transfer` | Audio (lazy) |
 | `ubuntu_container_t` | `hal_camera_service` | `binder: call transfer` | Camera (lazy) |
 | `ubuntu_container_t` | `hal_graphics_*_service` | `binder: call transfer` | Graphics (lazy) |
+| `ubuntu_container_t` | `hal_telephony_service` | `binder: call transfer` | Telephony/Radio (lazy) |
+| `ubuntu_container_t` | `hal_radio_service` | `binder: call transfer` | Radio IRadio HAL (lazy) |
+| `ubuntu_container_t` | `rild_service` | `binder: call transfer` | RIL daemon access (lazy) |
 
 > [!NOTE]
 > All HAL services are **lazy and optional**. The container gracefully handles their absence — if a HAL isn't registered, the binder lookup simply returns `nullptr`.

@@ -29,6 +29,24 @@ chmod +x /scripts/*.sh
 /scripts/detect-gpu.sh
 /scripts/detect-vendor-services.sh
 
+echo "[Master Init] Stage 4a - WiFi/Modem Radio Unblock..."
+# Unblock wireless radios early (before pivot) so drivers can initialize
+for rfkill_path in /sys/class/rfkill/rfkill*/type; do
+    [ -f "$rfkill_path" ] || continue
+    rfkill_dir=$(dirname "$rfkill_path")
+    rfkill_type=$(cat "$rfkill_path" 2>/dev/null)
+    case "$rfkill_type" in
+        wlan|wwan|bluetooth)
+            echo 0 > "$rfkill_dir/soft" 2>/dev/null || true
+            ;;
+    esac
+done
+
+# Set modem device permissions for later access
+for dev in /dev/cdc-wdm* /dev/ttyACM* /dev/ttyUSB* /dev/ttyMT* /dev/ccci_* /dev/eemcs_*; do
+    [ -e "$dev" ] && chmod 0660 "$dev" 2>/dev/null || true
+done
+
 echo "[Master Init] Stage 5 - Virtual HAL Framework Preparations..."
 mkdir -p /dev/uhl
 chmod 0755 /dev/uhl

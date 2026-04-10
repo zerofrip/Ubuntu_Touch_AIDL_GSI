@@ -1,0 +1,27 @@
+[Unit]
+Description=Ubuntu GSI WiFi HAL — Vendor WiFi Bridge
+Documentation=https://github.com/zerofrip/Ubuntu_Touch_GSI
+After=binder-bridge.service network-pre.target
+Wants=binder-bridge.service
+Before=NetworkManager.service wpa_supplicant.service
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/ubuntu-gsi/aidl/wifi/wifi_hal.sh
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=60
+
+# Security hardening
+ProtectSystem=strict
+ReadWritePaths=/data /run/ubuntu-gsi /tmp /etc/wpa_supplicant /etc/NetworkManager /lib/firmware /run/wpa_supplicant
+NoNewPrivileges=false
+PrivateTmp=no
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=wifi-hal
+
+[Install]
+WantedBy=multi-user.target

@@ -110,6 +110,113 @@ if command -v nmcli >/dev/null 2>&1; then
     systemctl enable NetworkManager 2>/dev/null || true
 fi
 
+# ---------------------------------------------------------------------------
+# 4a. WiFi subsystem setup
+# ---------------------------------------------------------------------------
+log "Configuring WiFi subsystem"
+
+# Unblock WiFi radios (some vendors ship with soft-block)
+if command -v rfkill >/dev/null 2>&1; then
+    rfkill unblock wifi 2>/dev/null || true
+    rfkill unblock all 2>/dev/null || true
+    log "rfkill: unblocked WiFi radios"
+fi
+
+# Symlink vendor WiFi firmware into Linux firmware search path
+for fw_dir in \
+    /vendor/firmware/wlan \
+    /vendor/firmware \
+    /vendor/etc/wifi \
+    /odm/firmware \
+    /odm/etc/wifi; do
+    if [ -d "$fw_dir" ]; then
+        mkdir -p /lib/firmware/vendor
+        for fw_file in "$fw_dir"/*; do
+            [ -f "$fw_file" ] || continue
+            base=$(basename "$fw_file")
+            [ -e "/lib/firmware/$base" ] || ln -sf "$fw_file" "/lib/firmware/$base" 2>/dev/null || true
+        done
+        log "Linked vendor WiFi firmware from $fw_dir"
+    fi
+done
+
+# Generate base wpa_supplicant config if missing
+if [ ! -f /etc/wpa_supplicant/wpa_supplicant.conf ]; then
+    mkdir -p /etc/wpa_supplicant
+    cat > /etc/wpa_supplicant/wpa_supplicant.conf << 'WPAEOF'
+ctrl_interface=/run/wpa_supplicant
+ctrl_interface_group=0
+update_config=1
+p2p_disabled=1
+WPAEOF
+    log "Generated default wpa_supplicant.conf"
+fi
+
+# Configure NetworkManager WiFi backend
+mkdir -p /etc/NetworkManager/conf.d
+cat > /etc/NetworkManager/conf.d/wifi.conf << 'NMWIFI'
+[device]
+wifi.scan-rand-mac-address=no
+wifi.backend=wpa_supplicant
+
+[connectivity]
+enabled=true
+NMWIFI
+
+# Set regulatory domain from vendor if available
+if [ -f /vendor/build.prop ]; then
+    REGDOMAIN=$(grep "ro.boot.wificountrycode" /vendor/build.prop 2>/dev/null | cut -d'=' -f2 | tr -d '[:space:]')
+    if [ -n "$REGDOMAIN" ] && command -v iw >/dev/null 2>&1; then
+        echo "REGDOMAIN=$REGDOMAIN" > /etc/default/crda 2>/dev/null || true
+        log "WiFi regulatory domain: $REGDOMAIN"
+    fi
+fi
+
+log "WiFi subsystem configured"
+
+# ---------------------------------------------------------------------------
+# 4b. Telephony/modem setup
+# ---------------------------------------------------------------------------
+log "Configuring telephony subsystem"
+
+# Enable oFono or ModemManager
+if command -v ofonod >/dev/null 2>&1; then
+    systemctl enable ofono 2>/dev/null || true
+    log "oFono telephony service enabled"
+fi
+
+if command -v ModemManager >/dev/null 2>&1; then
+    systemctl enable ModemManager 2>/dev/null || true
+    log "ModemManager service enabled"
+fi
+
+# Unblock WWAN radios
+if command -v rfkill >/dev/null 2>&1; then
+    rfkill unblock wwan 2>/dev/null || true
+    log "rfkill: unblocked WWAN radios"
+fi
+
+# Set modem device permissions
+for dev in /dev/cdc-wdm* /dev/ttyACM* /dev/ttyUSB* /dev/ttyMT* /dev/ccci_* /dev/eemcs_*; do
+    [ -e "$dev" ] && chmod 0660 "$dev" 2>/dev/null || true
+done
+
+# Add ubuntu user to dialout group for modem access
+if id -u ubuntu >/dev/null 2>&1; then
+    usermod -aG dialout ubuntu 2>/dev/null || true
+fi
+
+# Configure NetworkManager for mobile broadband
+cat > /etc/NetworkManager/conf.d/modem.conf << 'NMMODEM'
+[main]
+plugins=keyfile
+
+[keyfile]
+unmanaged-devices=none
+NMMODEM
+
+log "Telephony subsystem configured"
+
 # Enable SSH
 if [ -f /etc/ssh/sshd_config ]; then
     systemctl enable ssh 2>/dev/null || true

@@ -22,6 +22,18 @@ iproute2
 iw
 wpasupplicant
 openssh-server
+crda
+wireless-regdb
+rfkill
+
+# Telephony / Modem
+ofono
+ofono-scripts
+modemmanager
+libqmi-utils
+libmbim-utils
+usb-modeswitch
+usb-modeswitch-data
 
 # Binder / IPC support
 libbinder-dev

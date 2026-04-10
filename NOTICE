@@ -161,6 +161,42 @@ Components used:
 Source: https://github.com/canonical/mir
 
 ================================================================================
+oFono — Mobile Telephony Stack
+================================================================================
+
+Copyright (C) 2008-2024 Intel Corporation and others
+
+oFono is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License version 2 as published by
+the Free Software Foundation.
+
+Source: https://git.kernel.org/pub/scm/network/ofono/ofono.git
+
+================================================================================
+ModemManager — Mobile Broadband Modem Management
+================================================================================
+
+Copyright (C) 2008-2024 Aleksander Morgado and others
+
+ModemManager is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License version 2 as
+published by the Free Software Foundation.
+
+Source: https://gitlab.freedesktop.org/mobile-broadband/ModemManager
+
+================================================================================
+libqmi — QMI Protocol Library
+================================================================================
+
+Copyright (C) 2012-2024 Aleksander Morgado and others
+
+libqmi is free software; you can redistribute it and/or modify it
+under the terms of the GNU Lesser General Public License as published
+by the Free Software Foundation; either version 2.1 of the License.
+
+Source: https://gitlab.freedesktop.org/mobile-broadband/libqmi
+
+================================================================================
 Onboard — On-screen Keyboard
 ================================================================================
 

@@ -23,6 +23,18 @@
       "binary": "/system/haf/sensor_daemon.sh",
       "critical": false,
       "delay_after": 0
+    },
+    {
+      "name": "WiFi Daemon",
+      "binary": "/system/haf/wifi_daemon.sh",
+      "critical": false,
+      "delay_after": 2
+    },
+    {
+      "name": "Telephony Daemon",
+      "binary": "/system/haf/telephony_daemon.sh",
+      "critical": false,
+      "delay_after": 3
     }
   ]
 }

@@ -92,6 +92,20 @@ mount --bind /dev/binderfs "$MERGED/dev/binderfs"
 cp /tmp/gpu_state "$MERGED/tmp/" 2>/dev/null
 cp /tmp/binder_state "$MERGED/tmp/" 2>/dev/null
 
+# Bind-mount Android RIL/modem sockets if available (for telephony HAL)
+if [ -d /dev/socket ]; then
+    mkdir -p "$MERGED/dev/socket"
+    mount --bind /dev/socket "$MERGED/dev/socket"
+    echo "[$(date -Iseconds)] [Master Pivot] Bound /dev/socket for RIL access." >> "$LOG_FILE"
+fi
+
+# Ensure vendor WiFi firmware is accessible from merged root
+if [ -d /vendor/firmware ]; then
+    mkdir -p "$MERGED/vendor/firmware"
+    # Already bind-mounted via /vendor, but ensure path is accessible
+    echo "[$(date -Iseconds)] [Master Pivot] Vendor firmware accessible via /vendor mount." >> "$LOG_FILE"
+fi
+
 if [ ! -x "$MERGED/lib/systemd/systemd" ]; then
      echo "[$(date -Iseconds)] [Master Pivot] FATAL: Pivot execution aborted. Systemd target corrupted." >> "$LOG_FILE"
      exit 1
