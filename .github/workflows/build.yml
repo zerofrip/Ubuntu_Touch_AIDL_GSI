@@ -38,6 +38,8 @@ jobs:
     needs: lint
     permissions:
       contents: write
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - uses: actions/checkout@v5
         with:
@@ -76,7 +78,7 @@ jobs:
 
       - name: Upload workflow artifacts
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ubuntu-gsi-${{ github.run_number }}
           path: |
