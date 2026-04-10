@@ -31,7 +31,7 @@ done
 
 # Detect WiFi interface
 WIFI_IFACE=""
-for attempt in $(seq 1 10); do
+for _attempt in $(seq 1 10); do
     for iface_path in /sys/class/net/*/wireless; do
         if [ -d "$iface_path" ]; then
             WIFI_IFACE=$(basename "$(dirname "$iface_path")")

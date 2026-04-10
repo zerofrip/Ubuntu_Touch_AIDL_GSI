@@ -29,7 +29,6 @@ VENDOR_FW_PATHS="
 "
 
 # Common wpa_supplicant config locations
-WPA_CONF_VENDOR="/vendor/etc/wifi/wpa_supplicant.conf"
 WPA_CONF_OVERLAY="/vendor/etc/wifi/wpa_supplicant_overlay.conf"
 WPA_CONF_SYSTEM="/etc/wpa_supplicant/wpa_supplicant.conf"
 WPA_CONF_NM="/etc/NetworkManager/conf.d/wifi.conf"
