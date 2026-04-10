@@ -236,6 +236,52 @@ fi
 log "Battery/power supply subsystem configured"
 
 # ---------------------------------------------------------------------------
+# 4-stor. Storage subsystem setup
+# ---------------------------------------------------------------------------
+log "Configuring storage subsystem"
+
+# Enable udisks2 for D-Bus storage management
+if systemctl list-unit-files udisks2.service >/dev/null 2>&1; then
+    systemctl enable udisks2.service 2>/dev/null || true
+    log "udisks2.service enabled"
+fi
+
+# Add block device udev rules
+cat >> /etc/udev/rules.d/60-ubuntu-gsi-modem.rules << 'STOREOF'
+
+# Block devices — allow udisks2 to enumerate storage
+SUBSYSTEM=="block", MODE="0660", GROUP="disk"
+STOREOF
+
+# Add ubuntu user to disk group for storage access
+if id -u ubuntu >/dev/null 2>&1; then
+    usermod -aG disk ubuntu 2>/dev/null || true
+fi
+
+log "Storage subsystem configured"
+
+# ---------------------------------------------------------------------------
+# 4-rtc. Hardware clock (RTC) setup
+# ---------------------------------------------------------------------------
+log "Configuring hardware clock"
+
+# Sync hardware clock to system on first boot
+if [ -c /dev/rtc0 ]; then
+    chmod 0644 /dev/rtc0 2>/dev/null || true
+    hwclock --hctosys 2>/dev/null || true
+    log "Hardware clock synced to system time"
+fi
+
+# Enable NTP time sync
+if systemctl list-unit-files systemd-timesyncd.service >/dev/null 2>&1; then
+    systemctl enable systemd-timesyncd.service 2>/dev/null || true
+    timedatectl set-ntp true 2>/dev/null || true
+    log "NTP time synchronization enabled"
+fi
+
+log "Hardware clock configured"
+
+# ---------------------------------------------------------------------------
 # 4-gps. GPS/GNSS subsystem setup
 # ---------------------------------------------------------------------------
 log "Configuring GPS/GNSS subsystem"

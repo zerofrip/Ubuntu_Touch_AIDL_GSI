@@ -88,6 +88,43 @@ mkdir -p "$MERGED/vendor" "$MERGED/dev/binderfs" "$MERGED/tmp" "$MERGED/data/uhl
 mount --bind /vendor "$MERGED/vendor"
 mount --bind /dev/binderfs "$MERGED/dev/binderfs"
 
+# Bind-mount /data for userdata partition visibility (storage info)
+if [ -d /data ]; then
+    mkdir -p "$MERGED/data"
+    mount --bind /data "$MERGED/data"
+    echo "[$(date -Iseconds)] [Master Pivot] Bound /data for storage access." >> "$LOG_FILE"
+fi
+
+# Bind-mount /dev/block for block device discovery (udisks2, lsblk)
+if [ -d /dev/block ]; then
+    mkdir -p "$MERGED/dev/block"
+    mount --bind /dev/block "$MERGED/dev/block"
+    echo "[$(date -Iseconds)] [Master Pivot] Bound /dev/block for storage discovery." >> "$LOG_FILE"
+fi
+
+# Bind-mount /sys/block for partition/disk info (udisks2, df)
+if [ -d /sys/block ]; then
+    mkdir -p "$MERGED/sys/block"
+    mount --bind /sys/block "$MERGED/sys/block"
+    echo "[$(date -Iseconds)] [Master Pivot] Bound /sys/block for disk info." >> "$LOG_FILE"
+fi
+
+# Bind-mount /dev/rtc for hardware clock access
+for rtc_dev in /dev/rtc /dev/rtc0; do
+    if [ -c "$rtc_dev" ]; then
+        rtc_name=$(basename "$rtc_dev")
+        touch "$MERGED/dev/$rtc_name" 2>/dev/null
+        mount --bind "$rtc_dev" "$MERGED/dev/$rtc_name"
+        echo "[$(date -Iseconds)] [Master Pivot] Bound $rtc_dev for hardware clock." >> "$LOG_FILE"
+    fi
+done
+
+# Bind-mount /sys/class/rtc for RTC sysfs interface
+if [ -d /sys/class/rtc ]; then
+    mkdir -p "$MERGED/sys/class/rtc"
+    mount --bind /sys/class/rtc "$MERGED/sys/class/rtc"
+fi
+
 # Securely preserve Discovery states into the Systemd environment natively
 cp /tmp/gpu_state "$MERGED/tmp/" 2>/dev/null
 cp /tmp/binder_state "$MERGED/tmp/" 2>/dev/null
