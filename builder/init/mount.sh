@@ -182,6 +182,13 @@ if [ -d /vendor/firmware ]; then
     echo "[$(date -Iseconds)] [Master Pivot] Vendor firmware accessible via /vendor mount." >> "$LOG_FILE"
 fi
 
+# Bind-mount /sys/class/power_supply for battery status/capacity
+if [ -d /sys/class/power_supply ]; then
+    mkdir -p "$MERGED/sys/class/power_supply"
+    mount --bind /sys/class/power_supply "$MERGED/sys/class/power_supply"
+    echo "[$(date -Iseconds)] [Master Pivot] Bound /sys/class/power_supply for battery access." >> "$LOG_FILE"
+fi
+
 # Bind-mount /sys/bus/iio for IIO sensor access (light, proximity, accel, etc.)
 if [ -d /sys/bus/iio/devices ]; then
     mkdir -p "$MERGED/sys/bus/iio"

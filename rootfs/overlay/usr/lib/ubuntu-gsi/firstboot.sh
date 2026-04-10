@@ -199,6 +199,43 @@ if systemctl list-unit-files iio-sensor-proxy.service >/dev/null 2>&1; then
 fi
 
 # ---------------------------------------------------------------------------
+# 4-bat. Battery / power supply setup
+# ---------------------------------------------------------------------------
+log "Configuring battery/power supply subsystem"
+
+# Set battery sysfs permissions for upower access
+for psu in /sys/class/power_supply/*; do
+    [ -d "$psu" ] || continue
+    chmod 0644 "$psu/capacity" 2>/dev/null || true
+    chmod 0644 "$psu/status" 2>/dev/null || true
+    chmod 0644 "$psu/type" 2>/dev/null || true
+    chmod 0644 "$psu/online" 2>/dev/null || true
+    chmod 0644 "$psu/voltage_now" 2>/dev/null || true
+    chmod 0644 "$psu/current_now" 2>/dev/null || true
+    chmod 0644 "$psu/temp" 2>/dev/null || true
+    chmod 0644 "$psu/charge_full" 2>/dev/null || true
+    chmod 0644 "$psu/charge_now" 2>/dev/null || true
+    chmod 0644 "$psu/health" 2>/dev/null || true
+    chmod 0644 "$psu/technology" 2>/dev/null || true
+    log "Power supply permissions set: $(basename "$psu")"
+done
+
+# Add udev rules for power_supply subsystem
+cat >> /etc/udev/rules.d/60-ubuntu-gsi-modem.rules << 'PSUEOF'
+
+# Battery / power supply — allow upower to read battery attributes
+SUBSYSTEM=="power_supply", MODE="0644"
+PSUEOF
+
+# Enable upower daemon
+if systemctl list-unit-files upower.service >/dev/null 2>&1; then
+    systemctl enable upower.service 2>/dev/null || true
+    log "upower.service enabled"
+fi
+
+log "Battery/power supply subsystem configured"
+
+# ---------------------------------------------------------------------------
 # 4-gps. GPS/GNSS subsystem setup
 # ---------------------------------------------------------------------------
 log "Configuring GPS/GNSS subsystem"
