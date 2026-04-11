@@ -1,0 +1,15 @@
+[Unit]
+Description=Ubuntu GSI USB Gadget (MTP + RNDIS)
+Documentation=https://github.com/zerofrip/Ubuntu_Touch_GSI
+After=local-fs.target sys-kernel-config.mount
+Wants=sys-kernel-config.mount
+ConditionPathIsDirectory=/sys/class/udc
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/lib/ubuntu-gsi/usb-gadget.sh start
+ExecStop=/usr/lib/ubuntu-gsi/usb-gadget.sh stop
+
+[Install]
+WantedBy=multi-user.target

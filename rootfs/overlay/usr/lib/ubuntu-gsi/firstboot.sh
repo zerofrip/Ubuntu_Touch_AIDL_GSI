@@ -261,6 +261,24 @@ fi
 log "Storage subsystem configured"
 
 # ---------------------------------------------------------------------------
+# 4-usb. USB gadget setup (MTP + RNDIS for PC connection)
+# ---------------------------------------------------------------------------
+log "Configuring USB gadget (MTP + RNDIS)"
+
+if [ -f /usr/lib/ubuntu-gsi/usb-gadget.sh ]; then
+    chmod +x /usr/lib/ubuntu-gsi/usb-gadget.sh
+    systemctl enable usb-gadget.service 2>/dev/null || true
+    log "usb-gadget.service enabled (MTP file transfer + RNDIS network)"
+fi
+
+# Add ubuntu user to plugdev group for USB device access
+if id -u ubuntu >/dev/null 2>&1; then
+    usermod -aG plugdev ubuntu 2>/dev/null || true
+fi
+
+log "USB gadget configured"
+
+# ---------------------------------------------------------------------------
 # 4-rtc. Hardware clock (RTC) setup
 # ---------------------------------------------------------------------------
 log "Configuring hardware clock"

@@ -209,7 +209,7 @@ if [ -d "$SYSTEMD_DIR" ]; then
     cp "$SYSTEMD_DIR"/*.timer "$TARGET_DIR/etc/systemd/system/" 2>/dev/null || true
 
     # Enable services
-    for service in binder-bridge lomiri ubuntu-gsi-firstboot ubuntu-gsi-setup-wizard; do
+    for service in binder-bridge lomiri ubuntu-gsi-firstboot ubuntu-gsi-setup-wizard usb-gadget; do
         if [ -f "$TARGET_DIR/etc/systemd/system/${service}.service" ]; then
             chroot "$TARGET_DIR" systemctl enable "${service}.service" 2>/dev/null || true
             info "Enabled: ${service}.service"
