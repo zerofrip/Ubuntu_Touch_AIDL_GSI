@@ -279,6 +279,25 @@ fi
 log "USB gadget configured"
 
 # ---------------------------------------------------------------------------
+# 4-usb-otg. USB OTG (Host mode) setup
+# ---------------------------------------------------------------------------
+log "Configuring USB OTG (host mode)"
+
+if [ -f /usr/lib/ubuntu-gsi/usb-otg.sh ]; then
+    chmod +x /usr/lib/ubuntu-gsi/usb-otg.sh
+    log "USB OTG role switch script installed"
+fi
+
+# Ensure input group exists and add ubuntu user for USB HID devices
+if id -u ubuntu >/dev/null 2>&1; then
+    groupadd -f input 2>/dev/null || true
+    usermod -aG input ubuntu 2>/dev/null || true
+    usermod -aG dialout ubuntu 2>/dev/null || true
+fi
+
+log "USB OTG configured (auto role switch via udev)"
+
+# ---------------------------------------------------------------------------
 # 4-rtc. Hardware clock (RTC) setup
 # ---------------------------------------------------------------------------
 log "Configuring hardware clock"

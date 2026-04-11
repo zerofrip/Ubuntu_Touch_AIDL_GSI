@@ -1,0 +1,27 @@
+# =============================================================================
+# 80-ubuntu-gsi-usb-otg.rules — USB OTG Role Switch & Device Rules
+# =============================================================================
+
+# --- OTG role switch: auto-detect host/device based on cable ---
+# Extcon state change (OTG cable inserted/removed)
+SUBSYSTEM=="extcon", ACTION=="change", RUN+="/usr/lib/ubuntu-gsi/usb-otg.sh auto"
+
+# USB role switch change
+SUBSYSTEM=="usb_role", ACTION=="change", RUN+="/usr/lib/ubuntu-gsi/usb-otg.sh auto"
+
+# Type-C role change
+SUBSYSTEM=="typec", ACTION=="change", RUN+="/usr/lib/ubuntu-gsi/usb-otg.sh auto"
+
+# --- USB storage: auto-permissions for udisks2 ---
+SUBSYSTEM=="block", ACTION=="add", ATTRS{removable}=="1", MODE="0660", GROUP="disk"
+SUBSYSTEM=="usb", ACTION=="add", ATTR{bDeviceClass}=="08", MODE="0660", GROUP="disk"
+
+# --- USB HID: keyboard, mouse, gamepad ---
+SUBSYSTEM=="input", ACTION=="add", ATTRS{id/bustype}=="0003", MODE="0664", GROUP="input"
+
+# --- USB audio devices ---
+SUBSYSTEM=="sound", ACTION=="add", ATTRS{idVendor}=="*", MODE="0666"
+
+# --- USB serial/tty adapters ---
+SUBSYSTEM=="tty", ACTION=="add", ATTRS{idVendor}=="*", KERNEL=="ttyUSB*", MODE="0660", GROUP="dialout"
+SUBSYSTEM=="tty", ACTION=="add", ATTRS{idVendor}=="*", KERNEL=="ttyACM*", MODE="0660", GROUP="dialout"
