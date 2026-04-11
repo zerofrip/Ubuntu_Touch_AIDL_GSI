@@ -802,6 +802,116 @@ if command -v systemctl >/dev/null 2>&1; then
 fi
 
 # ---------------------------------------------------------------------------
+# 4h2. Biometric authentication (fingerprint / face)
+# ---------------------------------------------------------------------------
+log "Configuring biometric authentication"
+
+# -- Fingerprint --
+FP_DETECTED=0
+
+# Detect fingerprint device (sysfs, /dev, vendor init.rc)
+for fp_dev in /dev/fingerprint* /dev/goodix_fp /dev/fpc1020 /dev/silead_fp \
+              /dev/elan_fp /dev/cdfinger /dev/sunwave_fp; do
+    if [ -c "$fp_dev" ] || [ -e "$fp_dev" ]; then
+        chmod 0660 "$fp_dev" 2>/dev/null || true
+        chgrp input "$fp_dev" 2>/dev/null || true
+        FP_DETECTED=1
+        log "Fingerprint device found: $fp_dev"
+        break
+    fi
+done
+
+if [ "$FP_DETECTED" -eq 0 ]; then
+    for rc_file in /vendor/etc/init/*.rc /odm/etc/init/*.rc; do
+        [ -f "$rc_file" ] || continue
+        if grep -qi "fingerprint" "$rc_file" 2>/dev/null; then
+            FP_DETECTED=1
+            log "Vendor fingerprint service detected in: $rc_file"
+            break
+        fi
+    done
+fi
+
+# Udev rule for fingerprint devices
+cat > /etc/udev/rules.d/80-fingerprint.rules <<'FPEOF'
+# Fingerprint reader devices
+KERNEL=="fingerprint*", MODE="0660", GROUP="input"
+KERNEL=="goodix_fp", MODE="0660", GROUP="input"
+KERNEL=="fpc1020", MODE="0660", GROUP="input"
+KERNEL=="silead_fp", MODE="0660", GROUP="input"
+KERNEL=="elan_fp", MODE="0660", GROUP="input"
+KERNEL=="cdfinger", MODE="0660", GROUP="input"
+KERNEL=="sunwave_fp", MODE="0660", GROUP="input"
+FPEOF
+
+if command -v fprintd >/dev/null 2>&1; then
+    log "fprintd available — fingerprint enrollment ready"
+    log "  Enroll: fprintd-enroll -f right-index-finger ubuntu"
+    log "  Verify: fprintd-verify ubuntu"
+else
+    log "WARN: fprintd not installed — fingerprint auth unavailable"
+fi
+
+# -- Face authentication --
+FACE_DETECTED=0
+
+for rc_file in /vendor/etc/init/*.rc /odm/etc/init/*.rc; do
+    [ -f "$rc_file" ] || continue
+    if grep -qi "face.*auth\|biometric.*face" "$rc_file" 2>/dev/null; then
+        FACE_DETECTED=1
+        log "Vendor face auth service detected in: $rc_file"
+        break
+    fi
+done
+
+if command -v howdy >/dev/null 2>&1; then
+    log "Howdy available — face recognition ready"
+    log "  Add face: sudo howdy add"
+    log "  Test: sudo howdy test"
+else
+    log "WARN: howdy not installed — face auth unavailable"
+fi
+
+# -- PAM integration for biometrics --
+if [ -f /etc/pam.d/common-auth ]; then
+    PAM_MODIFIED=0
+
+    # Add pam_fprintd (fingerprint) before pam_unix if available
+    if [ -f /usr/lib/*/security/pam_fprintd.so ] || [ -f /lib/*/security/pam_fprintd.so ]; then
+        if ! grep -q "pam_fprintd" /etc/pam.d/common-auth 2>/dev/null; then
+            sed -i '/^auth.*pam_unix\.so/i auth\tsufficient\tpam_fprintd.so' \
+                /etc/pam.d/common-auth 2>/dev/null || true
+            PAM_MODIFIED=1
+            log "PAM: pam_fprintd added to common-auth"
+        fi
+    fi
+
+    # Add pam_howdy (face) before fingerprint if available
+    if [ -f /usr/lib/*/security/pam_howdy.so ] || [ -f /lib/*/security/pam_howdy.so ]; then
+        if ! grep -q "pam_howdy" /etc/pam.d/common-auth 2>/dev/null; then
+            if grep -q "pam_fprintd" /etc/pam.d/common-auth 2>/dev/null; then
+                sed -i '/pam_fprintd/i auth\tsufficient\tpam_howdy.so' \
+                    /etc/pam.d/common-auth 2>/dev/null || true
+            else
+                sed -i '/^auth.*pam_unix\.so/i auth\tsufficient\tpam_howdy.so' \
+                    /etc/pam.d/common-auth 2>/dev/null || true
+            fi
+            PAM_MODIFIED=1
+            log "PAM: pam_howdy added to common-auth"
+        fi
+    fi
+
+    if [ "$PAM_MODIFIED" -eq 1 ]; then
+        log "PAM biometric auth chain: face → fingerprint → password"
+    fi
+fi
+
+# Enable biometric HAL services
+systemctl enable fingerprint-hal.service 2>/dev/null || true
+systemctl enable face-hal.service 2>/dev/null || true
+log "Biometric authentication configured"
+
+# ---------------------------------------------------------------------------
 # 4i. Lock screen / Greeter
 # ---------------------------------------------------------------------------
 log "Configuring lock screen"

@@ -66,6 +66,11 @@ libasound2-plugins
 # Sensors
 iio-sensor-proxy
 
+# Biometric authentication
+fprintd
+libpam-fprintd
+# howdy — installed from PPA or source (not in Ubuntu main repos)
+
 # GPS / GNSS
 gpsd
 gpsd-clients

@@ -88,6 +88,22 @@
       "critical": false,
       "start_delay": 0,
       "description": "Vibrator via sysfs timed_output/LED/FF input"
+    },
+    {
+      "name": "fingerprint",
+      "aidl_interface": "android.hardware.biometrics.fingerprint.IFingerprint",
+      "binary": "/system/aidl/fingerprint/fingerprint_hal.sh",
+      "critical": false,
+      "start_delay": 2,
+      "description": "Fingerprint auth via fprintd/libfprint to vendor fingerprint HAL"
+    },
+    {
+      "name": "face",
+      "aidl_interface": "android.hardware.biometrics.face.IFace",
+      "binary": "/system/aidl/face/face_hal.sh",
+      "critical": false,
+      "start_delay": 2,
+      "description": "Face auth via Howdy/IR camera to vendor face HAL"
     }
   ]
 }
