@@ -853,12 +853,9 @@ else
 fi
 
 # -- Face authentication --
-FACE_DETECTED=0
-
 for rc_file in /vendor/etc/init/*.rc /odm/etc/init/*.rc; do
     [ -f "$rc_file" ] || continue
     if grep -qi "face.*auth\|biometric.*face" "$rc_file" 2>/dev/null; then
-        FACE_DETECTED=1
         log "Vendor face auth service detected in: $rc_file"
         break
     fi
@@ -877,7 +874,7 @@ if [ -f /etc/pam.d/common-auth ]; then
     PAM_MODIFIED=0
 
     # Add pam_fprintd (fingerprint) before pam_unix if available
-    if [ -f /usr/lib/*/security/pam_fprintd.so ] || [ -f /lib/*/security/pam_fprintd.so ]; then
+    if compgen -G '/usr/lib/*/security/pam_fprintd.so' >/dev/null 2>&1 || compgen -G '/lib/*/security/pam_fprintd.so' >/dev/null 2>&1; then
         if ! grep -q "pam_fprintd" /etc/pam.d/common-auth 2>/dev/null; then
             sed -i '/^auth.*pam_unix\.so/i auth\tsufficient\tpam_fprintd.so' \
                 /etc/pam.d/common-auth 2>/dev/null || true
@@ -887,7 +884,7 @@ if [ -f /etc/pam.d/common-auth ]; then
     fi
 
     # Add pam_howdy (face) before fingerprint if available
-    if [ -f /usr/lib/*/security/pam_howdy.so ] || [ -f /lib/*/security/pam_howdy.so ]; then
+    if compgen -G '/usr/lib/*/security/pam_howdy.so' >/dev/null 2>&1 || compgen -G '/lib/*/security/pam_howdy.so' >/dev/null 2>&1; then
         if ! grep -q "pam_howdy" /etc/pam.d/common-auth 2>/dev/null; then
             if grep -q "pam_fprintd" /etc/pam.d/common-auth 2>/dev/null; then
                 sed -i '/pam_fprintd/i auth\tsufficient\tpam_howdy.so' \
