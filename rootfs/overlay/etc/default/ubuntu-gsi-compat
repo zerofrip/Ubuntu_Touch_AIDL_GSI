@@ -1,0 +1,52 @@
+# =============================================================================
+# /etc/default/ubuntu-gsi-compat — User-overridable compatibility toggles
+# =============================================================================
+# This file is sourced by /usr/lib/ubuntu-gsi/compat/compat-engine.sh and
+# /usr/lib/ubuntu-gsi/compat/prop-handler.sh AFTER the auto-detected runtime
+# defaults (compat-engine.sh writes to ubuntu-gsi-compat.runtime). Anything
+# you set here therefore overrides the matched quirk profile.
+#
+# Reference repositories that informed these toggles:
+#   - https://github.com/phhusson/device_phh_treble
+#     (system.prop, phh-on-boot.sh, phh-prop-handler.sh)
+#   - https://github.com/phhusson/vendor_hardware_overlay
+#     (per-vendor overlay selection)
+#   - https://github.com/TrebleDroid/treble_app
+#     (Misc.kt persist.sys.phh.* runtime toggles)
+# =============================================================================
+
+# --- Master kill switch -------------------------------------------------------
+# Set to 1 to skip ALL quirk processing on boot (useful for diagnostics).
+#UBUNTU_GSI_COMPAT_DISABLE=0
+
+# --- Detected vendor (auto-populated, override only if mis-detected) ----------
+# Allowed: qcom | mtk | exynos | hisilicon | unisoc | google | rockchip | unknown
+#UBUNTU_GSI_VENDOR=
+
+# --- Double-tap-to-wake (mirror of treble_app Misc.dt2w + phh-prop-handler) ---
+# Allowed: xiaomi | redmi | poco | oppo | realme | oneplus | asus |
+#          transsion | vsmart | <empty>
+#UBUNTU_GSI_DT2W_VENDOR=
+
+# --- Audio quirks (treble_app Misc.headsetFix / disableAudioEffects) ----------
+#UBUNTU_GSI_HEADSET_FIX=0
+#UBUNTU_GSI_HEADSET_DEVINPUT=0
+
+# --- BT system audio HAL (treble_app Misc.sysbta / phh system.prop) -----------
+#UBUNTU_GSI_BT_SYSTEM_AUDIO=0
+
+# --- USB gadget (Samsung FFS-MTP, phh system.prop vendor.usb.use_ffs_mtp) -----
+#UBUNTU_GSI_USB_FFS_MTP=0
+
+# --- Telephony (treble_app Misc.restartRil / phh-on-boot.sh mtkmal) -----------
+#UBUNTU_GSI_RESTART_RIL=0
+
+# --- Display / shell quirks (vendor_hardware_overlay/HighPriorityMisc) --------
+#UBUNTU_GSI_FORCE_NAVBAR=0
+#UBUNTU_GSI_NOTCH_EXTEND=0
+#UBUNTU_GSI_BACKLIGHT_SCALE=0
+
+# --- Misc baselines -----------------------------------------------------------
+#UBUNTU_GSI_COMPAT_BASELINE=1
+#UBUNTU_GSI_AUDIO_POLICY=base
+#UBUNTU_GSI_BATTERY_HOTSWAP=0

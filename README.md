@@ -8,10 +8,37 @@ A production-grade Ubuntu Touch distribution that runs natively on Android Trebl
 
 ## Reference Repositories
 
-The following repositories were referenced to improve device compatibility:
+The following repositories were referenced to improve device compatibility.
+Their patterns are translated into Linux-userspace primitives by the GSI's
+[compatibility engine](#compatibility-engine-phhtrebledroid-style):
 
-- [device_phh_treble](https://github.com/phhusson/device_phh_treble)
-- [vendor_hardware_overlay](https://github.com/phhusson/vendor_hardware_overlay)
+- [phhusson/device_phh_treble](https://github.com/phhusson/device_phh_treble)
+  — `system.prop`, `phh-on-boot.sh`, `phh-prop-handler.sh` provide the
+  baseline property overrides and per-vendor sysfs/proc workarounds.
+- [phhusson/vendor_hardware_overlay](https://github.com/phhusson/vendor_hardware_overlay)
+  — per-brand overlay selection (`Misc/`, `HighPriorityMisc/`, vendor folders)
+  feeds the brand/model match table in `compat/quirks.json`.
+- [TrebleDroid/treble_app](https://github.com/TrebleDroid/treble_app)
+  — `Misc.kt` runtime toggles (DT2W, force navbar, multi-camera,
+  `persist.bluetooth.system_audio_hal.enabled`, headset fix, etc.) are mapped
+  to Linux equivalents in `compat/prop-handler.sh`.
+
+### Compatibility engine (PHH/TrebleDroid-style)
+
+`rootfs/overlay/usr/lib/ubuntu-gsi/compat/` ships:
+
+| Path                          | Purpose                                                                                  |
+| ----------------------------- | ---------------------------------------------------------------------------------------- |
+| `quirks.json`                 | Match table keyed on `ro.board.platform`, brand, model, fingerprint                      |
+| `compat-engine.sh`            | Loads quirks, applies sysfs/proc/systemd actions, emits `/run/ubuntu-gsi/compat-status.json` |
+| `prop-handler.sh`             | Linux translation of `phh-prop-handler.sh` (DT2W/OTG/audio/BT/MTP toggles)               |
+| `lib/detect-platform.sh`      | Reads `/vendor/build.prop` & friends → emits flat env file + JSON snapshot               |
+| `/etc/default/ubuntu-gsi-compat` | User-overridable toggles (master kill switch + per-feature flags)                     |
+
+The systemd unit `ubuntu-gsi-compat.service` runs once after `binder-bridge.service`
+and before any HAL service so vendor-specific quirks land before the HAL wrappers
+probe the device. A diagnostic JSON is written to
+`/run/ubuntu-gsi/compat-status.json` containing matched rules and counters.
 
 ## Architecture
 

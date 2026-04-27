@@ -1,0 +1,37 @@
+[Unit]
+Description=Ubuntu GSI — PHH/TrebleDroid-style compatibility engine
+Documentation=https://github.com/zerofrip/Ubuntu_Touch_AIDL_GSI
+Documentation=https://github.com/TrebleDroid/treble_app
+
+# Run after the binder bridge is up so HAL-affecting toggles propagate.
+After=binder-bridge.service local-fs.target sysinit.target
+Wants=binder-bridge.service local-fs.target
+
+# We also want HAL services to see the resulting env file.
+Before=audio-hal.service bluetooth-hal.service camera-hal.service \
+       fingerprint-hal.service face-hal.service gnss-hal.service \
+       input-hal.service sensor-hal.service telephony-hal.service \
+       vibrator-hal.service wifi-hal.service \
+       lomiri.service ubuntu-gsi-firstboot.service
+
+ConditionPathExists=/usr/lib/ubuntu-gsi/compat/compat-engine.sh
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+ExecStart=/usr/lib/ubuntu-gsi/compat/compat-engine.sh
+TimeoutStartSec=60
+
+# Hardening (relaxed for sysfs/proc writes the engine performs)
+NoNewPrivileges=false
+ProtectHome=read-only
+ProtectSystem=strict
+ReadWritePaths=/run /var/log /etc/default /tmp /sys /proc
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ubuntu-gsi-compat
+
+[Install]
+WantedBy=multi-user.target

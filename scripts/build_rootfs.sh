@@ -209,7 +209,7 @@ if [ -d "$SYSTEMD_DIR" ]; then
     cp "$SYSTEMD_DIR"/*.timer "$TARGET_DIR/etc/systemd/system/" 2>/dev/null || true
 
     # Enable services
-    for service in binder-bridge lomiri ubuntu-gsi-firstboot ubuntu-gsi-setup-wizard usb-gadget; do
+    for service in binder-bridge ubuntu-gsi-compat lomiri ubuntu-gsi-firstboot ubuntu-gsi-setup-wizard usb-gadget; do
         if [ -f "$TARGET_DIR/etc/systemd/system/${service}.service" ]; then
             chroot "$TARGET_DIR" systemctl enable "${service}.service" 2>/dev/null || true
             info "Enabled: ${service}.service"
@@ -258,6 +258,13 @@ fi
 # Setup wizard script
 if [ -f "$TARGET_DIR/usr/lib/ubuntu-gsi/setup-wizard.sh" ]; then
     chmod +x "$TARGET_DIR/usr/lib/ubuntu-gsi/setup-wizard.sh"
+fi
+
+# PHH/TrebleDroid-style compat layer (quirks.json + compat-engine.sh)
+if [ -d "$TARGET_DIR/usr/lib/ubuntu-gsi/compat" ]; then
+    find "$TARGET_DIR/usr/lib/ubuntu-gsi/compat" -type f -name '*.sh' \
+        -exec chmod +x {} \;
+    info "Compatibility engine installed (PHH/TrebleDroid-style quirk DB)"
 fi
 
 success "Ubuntu GSI components installed"

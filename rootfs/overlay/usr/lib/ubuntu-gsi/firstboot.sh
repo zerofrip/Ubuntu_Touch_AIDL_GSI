@@ -1145,6 +1145,26 @@ if [ -f /etc/ssh/sshd_config ]; then
 fi
 
 # ---------------------------------------------------------------------------
+# 4r. PHH/TrebleDroid-style compatibility engine
+#     Inspired by:
+#       - device_phh_treble (system.prop, phh-on-boot.sh, phh-prop-handler.sh)
+#       - vendor_hardware_overlay (per-brand selection)
+#       - TrebleDroid/treble_app (Misc.kt runtime toggles)
+# ---------------------------------------------------------------------------
+log "Configuring PHH/TrebleDroid-style compatibility engine"
+
+if [ -x /usr/lib/ubuntu-gsi/compat/compat-engine.sh ]; then
+    systemctl enable ubuntu-gsi-compat.service 2>/dev/null || true
+    log "ubuntu-gsi-compat.service enabled"
+
+    # Run once now so first-boot HAL services see the matched quirks immediately
+    /usr/lib/ubuntu-gsi/compat/compat-engine.sh >> "$LOG" 2>&1 || \
+        log "WARNING: initial compat-engine run failed — service will retry on next boot"
+else
+    log "Compat engine missing — skipping (compat layer not installed)"
+fi
+
+# ---------------------------------------------------------------------------
 # 5. Mask incompatible systemd units
 # ---------------------------------------------------------------------------
 log "Masking incompatible systemd units"

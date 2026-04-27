@@ -1,0 +1,238 @@
+{
+  "$schema": "https://github.com/zerofrip/Ubuntu_Touch_AIDL_GSI/blob/main/docs/compat-schema.json",
+  "_comment": [
+    "Ubuntu GSI compatibility quirk database.",
+    "Modeled after device_phh_treble (system.prop, phh-on-boot.sh,",
+    "phh-prop-handler.sh), vendor_hardware_overlay/Misc/* and",
+    "TrebleDroid/treble_app (Misc.kt) toggles, translated to Linux",
+    "userspace primitives (sysfs/proc/udev/systemd) instead of Android",
+    "system properties.",
+    "",
+    "Each entry is matched in order — the first match wins. Match",
+    "fields are AND-combined; missing/empty match fields are ignored.",
+    "",
+    "match.platform   : ro.board.platform / ro.hardware glob",
+    "match.brand      : ro.product.vendor.brand glob",
+    "match.model      : ro.product.vendor.model glob",
+    "match.fingerprint: ro.vendor.build.fingerprint glob",
+    "",
+    "actions[] entries supported:",
+    "  { type:'sysfs',  path,  value }     # echo value > path (best-effort)",
+    "  { type:'proc',   path,  value }     # same, /proc node",
+    "  { type:'modprobe', module }         # modprobe -q best effort",
+    "  { type:'rmmod',    module }         # rmmod -q best effort",
+    "  { type:'enable_service', unit }     # systemctl enable",
+    "  { type:'disable_service', unit }    # systemctl disable",
+    "  { type:'mask_service', unit }       # systemctl mask",
+    "  { type:'mkdir',   path,  mode }     # mkdir -p (chmod if mode given)",
+    "  { type:'symlink', src, dst }        # ln -sf src dst",
+    "  { type:'env',     key,  value }     # write to /etc/default/ubuntu-gsi-compat.runtime",
+    "  { type:'log',     message }         # diagnostic log only"
+  ],
+  "version": 2,
+  "rules": [
+    {
+      "id": "default-baseline",
+      "description": "Apply to every device — minimum sane defaults",
+      "match": {},
+      "actions": [
+        { "type": "log",   "message": "Applying baseline GSI compat profile" },
+        { "type": "env",   "key": "UBUNTU_GSI_COMPAT_BASELINE", "value": "1" },
+        { "type": "sysfs", "path": "/sys/module/lowmemorykiller/parameters/enable_adaptive_lmk", "value": "1" },
+        { "type": "mkdir", "path": "/run/ubuntu-gsi/compat", "mode": "0755" }
+      ]
+    },
+
+    {
+      "id": "qcom-snapdragon",
+      "description": "Qualcomm Snapdragon (msm*, kona, lahaina, taro, sm*)",
+      "match": { "platform": "msm*|kona|lahaina|taro|sm[0-9]*|sdm*|qcom*" },
+      "actions": [
+        { "type": "log",   "message": "Detected Qualcomm Snapdragon platform" },
+        { "type": "env",   "key": "UBUNTU_GSI_VENDOR", "value": "qcom" },
+        { "type": "sysfs", "path": "/sys/module/qpnp_smbcharger/parameters/usb_psy_typec_disable", "value": "1" },
+        { "type": "sysfs", "path": "/sys/class/qcom-battery/restricted_charging", "value": "0" }
+      ]
+    },
+
+    {
+      "id": "mtk-mediatek",
+      "description": "MediaTek (mt6*, mt8*) — disable MTK IMS gate, restart RIL",
+      "match": { "platform": "mt6*|mt8*|MT[68]*" },
+      "actions": [
+        { "type": "log",   "message": "Detected MediaTek platform" },
+        { "type": "env",   "key": "UBUNTU_GSI_VENDOR", "value": "mtk" },
+        { "type": "env",   "key": "UBUNTU_GSI_RESTART_RIL", "value": "1" },
+        { "type": "sysfs", "path": "/proc/sys/kernel/randomize_va_space", "value": "2" }
+      ]
+    },
+
+    {
+      "id": "exynos-samsung-soc",
+      "description": "Samsung Exynos / Universal SoC",
+      "match": { "platform": "exynos*|universal*|s5e*" },
+      "actions": [
+        { "type": "log", "message": "Detected Samsung Exynos platform" },
+        { "type": "env", "key": "UBUNTU_GSI_VENDOR", "value": "exynos" }
+      ]
+    },
+
+    {
+      "id": "kirin-hisilicon",
+      "description": "HiSilicon Kirin (Huawei)",
+      "match": { "platform": "kirin*|hi3*" },
+      "actions": [
+        { "type": "log", "message": "Detected HiSilicon Kirin platform" },
+        { "type": "env", "key": "UBUNTU_GSI_VENDOR", "value": "hisilicon" },
+        { "type": "env", "key": "UBUNTU_GSI_HEADSET_FIX", "value": "1" }
+      ]
+    },
+
+    {
+      "id": "unisoc-spreadtrum",
+      "description": "UNISOC / Spreadtrum",
+      "match": { "platform": "ums*|sp9*|sc9*|t6*" },
+      "actions": [
+        { "type": "log", "message": "Detected UNISOC/Spreadtrum platform" },
+        { "type": "env", "key": "UBUNTU_GSI_VENDOR", "value": "unisoc" }
+      ]
+    },
+
+    {
+      "id": "google-tensor",
+      "description": "Google Tensor (gs101/gs201/zuma/...)",
+      "match": { "platform": "gs[0-9]*|zuma*|whitechapel*" },
+      "actions": [
+        { "type": "log", "message": "Detected Google Tensor platform" },
+        { "type": "env", "key": "UBUNTU_GSI_VENDOR", "value": "google" }
+      ]
+    },
+
+    {
+      "id": "xiaomi-dt2w",
+      "description": "Xiaomi: enable double-tap-to-wake via known proc nodes",
+      "match": { "brand": "Xiaomi|Redmi|POCO|Poco" },
+      "actions": [
+        { "type": "log",   "message": "Xiaomi family — enabling DT2W proc nodes" },
+        { "type": "env",   "key": "UBUNTU_GSI_DT2W_VENDOR", "value": "xiaomi" },
+        { "type": "proc",  "path": "/proc/touchpanel/wakeup_gesture", "value": "1" },
+        { "type": "proc",  "path": "/proc/tp_wakeup_gesture",         "value": "1" },
+        { "type": "proc",  "path": "/proc/tp_gesture",                "value": "1" }
+      ]
+    },
+
+    {
+      "id": "oppo-realme-oneplus-touch",
+      "description": "OPPO/Realme/OnePlus: DT2W + USB-OTG + gaming proc nodes",
+      "match": { "brand": "OPPO|Oppo|realme|Realme|OnePlus|oneplus" },
+      "actions": [
+        { "type": "log",  "message": "OPPO family — DT2W/OTG/gaming nodes" },
+        { "type": "env",  "key": "UBUNTU_GSI_DT2W_VENDOR", "value": "oppo" },
+        { "type": "proc", "path": "/proc/touchpanel/double_tap_enable", "value": "1" },
+        { "type": "sysfs", "path": "/sys/class/power_supply/usb/otg_switch", "value": "1" },
+        { "type": "sysfs", "path": "/sys/class/oplus_chg/usb/otg_switch", "value": "1" }
+      ]
+    },
+
+    {
+      "id": "samsung-tweaks",
+      "description": "Samsung: prefer FFS-based MTP gadget; disable scsh quirks",
+      "match": { "brand": "samsung|Samsung" },
+      "actions": [
+        { "type": "log", "message": "Samsung family — FFS MTP + audio policy" },
+        { "type": "env", "key": "UBUNTU_GSI_USB_FFS_MTP", "value": "1" },
+        { "type": "env", "key": "UBUNTU_GSI_AUDIO_POLICY", "value": "samsung" }
+      ]
+    },
+
+    {
+      "id": "huawei-headset-fix",
+      "description": "Huawei: enable headset audio jack quirk via devinput",
+      "match": { "brand": "huawei|Huawei|HONOR|Honor" },
+      "actions": [
+        { "type": "log", "message": "Huawei family — devinput headset jack quirk" },
+        { "type": "env", "key": "UBUNTU_GSI_HEADSET_DEVINPUT", "value": "1" },
+        { "type": "env", "key": "UBUNTU_GSI_HEADSET_FIX",      "value": "1" }
+      ]
+    },
+
+    {
+      "id": "asus-zenmotion",
+      "description": "ASUS: enable Zen Motion gestures (proc fallback)",
+      "match": { "brand": "asus|Asus|ASUS" },
+      "actions": [
+        { "type": "log",  "message": "ASUS — Zen Motion gestures" },
+        { "type": "env",  "key": "UBUNTU_GSI_DT2W_VENDOR", "value": "asus" },
+        { "type": "proc", "path": "/proc/touchpanel/double_tap", "value": "1" }
+      ]
+    },
+
+    {
+      "id": "transsion-tecno-infinix",
+      "description": "Transsion (Tecno/Infinix): OTG + DT2W gesture function",
+      "match": { "brand": "Tecno|TECNO|Infinix|INFINIX|itel|Itel" },
+      "actions": [
+        { "type": "log",  "message": "Transsion family — OTG + gesture" },
+        { "type": "env",  "key": "UBUNTU_GSI_DT2W_VENDOR", "value": "transsion" }
+      ]
+    },
+
+    {
+      "id": "vivo-sony-mediatouch",
+      "description": "Vivo / Sony / Sharp — keep audio policy as base",
+      "match": { "brand": "vivo|Vivo|Sony|sony|Sharp|sharp" },
+      "actions": [
+        { "type": "log", "message": "vivo/Sony/Sharp — base audio policy" },
+        { "type": "env", "key": "UBUNTU_GSI_AUDIO_POLICY", "value": "base" }
+      ]
+    },
+
+    {
+      "id": "essential-ph1",
+      "description": "Essential PH-1 — hide camera notch via overlay flag",
+      "match": { "brand": "essential|Essential", "model": "PH-1*" },
+      "actions": [
+        { "type": "log", "message": "Essential PH-1 — extend status bar to notch" },
+        { "type": "env", "key": "UBUNTU_GSI_NOTCH_EXTEND", "value": "1" }
+      ]
+    },
+
+    {
+      "id": "fairphone-fp",
+      "description": "Fairphone — enable replaceable-battery friendly tweaks",
+      "match": { "brand": "Fairphone|FAIRPHONE|fairphone" },
+      "actions": [
+        { "type": "log", "message": "Fairphone — battery hot-swap friendly tweaks" },
+        { "type": "env", "key": "UBUNTU_GSI_BATTERY_HOTSWAP", "value": "1" }
+      ]
+    },
+
+    {
+      "id": "hmd-nokia",
+      "description": "Nokia / HMD Global",
+      "match": { "brand": "Nokia|nokia|HMD|hmd" },
+      "actions": [
+        { "type": "log", "message": "Nokia/HMD — base profile" }
+      ]
+    },
+
+    {
+      "id": "lg-htc-legacy",
+      "description": "LG / HTC — legacy navbar handling",
+      "match": { "brand": "LG|lg|LGE|HTC|htc" },
+      "actions": [
+        { "type": "log", "message": "LG/HTC — force navbar visibility" },
+        { "type": "env", "key": "UBUNTU_GSI_FORCE_NAVBAR", "value": "1" }
+      ]
+    },
+
+    {
+      "id": "treble-bluetooth-defaults",
+      "description": "PHH-style: enable system bluetooth audio HAL flag",
+      "match": {},
+      "actions": [
+        { "type": "env", "key": "UBUNTU_GSI_BT_SYSTEM_AUDIO", "value": "1" }
+      ]
+    }
+  ]
+}
