@@ -1,6 +1,6 @@
 [Unit]
 Description=Ubuntu GSI Input HAL — Touchscreen/Input Bridge
-Documentation=https://github.com/zerofrip/Ubuntu_Touch_GSI
+Documentation=https://github.com/zerofrip/Ubuntu_Touch_AIDL_GSI
 After=binder-bridge.service systemd-udevd.service
 Wants=binder-bridge.service
 Before=lomiri.service

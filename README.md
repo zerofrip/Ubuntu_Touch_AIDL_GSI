@@ -1,7 +1,7 @@
 # Ubuntu Touch GSI — Mobile Linux for Android Devices
 
-[![Build](https://github.com/zerofrip/Ubuntu_Touch_GSI/actions/workflows/build.yml/badge.svg)](https://github.com/zerofrip/Ubuntu_Touch_GSI/actions/workflows/build.yml)
-[![Lint](https://github.com/zerofrip/Ubuntu_Touch_GSI/actions/workflows/lint.yml/badge.svg)](https://github.com/zerofrip/Ubuntu_Touch_GSI/actions/workflows/lint.yml)
+[![Build](https://github.com/zerofrip/Ubuntu_Touch_AIDL_GSI/actions/workflows/build.yml/badge.svg)](https://github.com/zerofrip/Ubuntu_Touch_AIDL_GSI/actions/workflows/build.yml)
+[![Lint](https://github.com/zerofrip/Ubuntu_Touch_AIDL_GSI/actions/workflows/lint.yml/badge.svg)](https://github.com/zerofrip/Ubuntu_Touch_AIDL_GSI/actions/workflows/lint.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 A production-grade Ubuntu Touch distribution that runs natively on Android Treble devices. Uses AIDL-only binder IPC, Mir/Wayland display, and Lomiri shell to deliver a full Linux mobile experience on Android hardware.
@@ -32,7 +32,7 @@ A production-grade Ubuntu Touch distribution that runs natively on Android Trebl
 
 ```bash
 # Clone
-git clone --recursive https://github.com/zerofrip/Ubuntu_Touch_GSI.git
+git clone --recursive https://github.com/zerofrip/Ubuntu_Touch_AIDL_GSI.git
 cd Ubuntu_GSI
 
 # Build everything (system.img + userdata.img)

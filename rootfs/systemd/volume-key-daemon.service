@@ -1,6 +1,6 @@
 [Unit]
 Description=Ubuntu GSI Volume Key Daemon
-Documentation=https://github.com/zerofrip/Ubuntu_Touch_GSI
+Documentation=https://github.com/zerofrip/Ubuntu_Touch_AIDL_GSI
 After=pulseaudio.service input-hal.service
 Wants=pulseaudio.service
 

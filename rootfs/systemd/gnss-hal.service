@@ -1,6 +1,6 @@
 [Unit]
 Description=Ubuntu GSI GNSS HAL — gpsd/Geoclue GPS Bridge
-Documentation=https://github.com/zerofrip/Ubuntu_Touch_GSI
+Documentation=https://github.com/zerofrip/Ubuntu_Touch_AIDL_GSI
 After=binder-bridge.service systemd-udevd.service
 Wants=binder-bridge.service
 ConditionPathExists=/usr/lib/ubuntu-gsi/aidl/gnss/gnss_hal.sh

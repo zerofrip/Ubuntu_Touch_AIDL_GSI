@@ -1,6 +1,6 @@
 [Unit]
 Description=Ubuntu GSI Fingerprint HAL — fprintd/libfprint Bridge
-Documentation=https://github.com/zerofrip/Ubuntu_Touch_GSI
+Documentation=https://github.com/zerofrip/Ubuntu_Touch_AIDL_GSI
 After=binder-bridge.service systemd-udevd.service
 Wants=binder-bridge.service
 ConditionPathExists=/usr/lib/ubuntu-gsi/aidl/fingerprint/fingerprint_hal.sh

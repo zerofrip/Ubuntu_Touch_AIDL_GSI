@@ -1,6 +1,6 @@
 [Unit]
 Description=Ubuntu GSI Sensor HAL — IIO/iio-sensor-proxy Bridge
-Documentation=https://github.com/zerofrip/Ubuntu_Touch_GSI
+Documentation=https://github.com/zerofrip/Ubuntu_Touch_AIDL_GSI
 After=binder-bridge.service systemd-udevd.service
 Wants=binder-bridge.service
 ConditionPathExists=/usr/lib/ubuntu-gsi/aidl/sensors/sensors_hal.sh

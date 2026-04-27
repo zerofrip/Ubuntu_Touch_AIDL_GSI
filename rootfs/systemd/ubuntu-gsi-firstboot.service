@@ -1,6 +1,6 @@
 [Unit]
 Description=Ubuntu GSI First Boot Setup
-Documentation=https://github.com/zerofrip/Ubuntu_Touch_GSI
+Documentation=https://github.com/zerofrip/Ubuntu_Touch_AIDL_GSI
 ConditionPathExists=!/data/uhl_overlay/.firstboot_complete
 After=local-fs.target
 Before=binder-bridge.service lomiri.service

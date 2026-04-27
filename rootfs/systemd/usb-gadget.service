@@ -1,6 +1,6 @@
 [Unit]
 Description=Ubuntu GSI USB Gadget (MTP + RNDIS)
-Documentation=https://github.com/zerofrip/Ubuntu_Touch_GSI
+Documentation=https://github.com/zerofrip/Ubuntu_Touch_AIDL_GSI
 After=local-fs.target sys-kernel-config.mount
 Wants=sys-kernel-config.mount
 ConditionPathIsDirectory=/sys/class/udc

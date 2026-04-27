@@ -1,6 +1,6 @@
 [Unit]
 Description=Ubuntu GSI GUI Setup Wizard
-Documentation=https://github.com/zerofrip/Ubuntu_Touch_GSI
+Documentation=https://github.com/zerofrip/Ubuntu_Touch_AIDL_GSI
 ConditionPathExists=/data/uhl_overlay/.setup_wizard_pending
 ConditionPathExists=!/data/uhl_overlay/.setup_wizard_complete
 After=lomiri.service graphical.target dbus.service

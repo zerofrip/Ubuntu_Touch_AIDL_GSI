@@ -97,7 +97,6 @@ udisks2
 
 # USB OTG / Host mode
 usbutils
-usb-modeswitch
 
 # Web Browser (standalone)
 firefox
