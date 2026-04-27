@@ -1,6 +1,6 @@
 # Architecture (Halium-style, AIDL)
 
-This repository now uses a Halium-style architecture:
+This repository uses a Halium-style architecture:
 
 - Stock `boot.img` and stock kernel boot Android normally.
 - PHH-based `system.img` carries Halium overlay components.
@@ -8,15 +8,15 @@ This repository now uses a Halium-style architecture:
 
 ## High-level flow
 
-```mermaid
-flowchart TD
-    BL[Bootloader] --> K[Stock kernel + stock ramdisk init]
-    K --> A[Android userspace + vendor HAL services]
-    A --> RC[/system/etc/init/ubuntu-gsi.rc]
-    RC --> L[/system/bin/ubuntu-gsi-launcher]
-    L --> R[Mount rootfs.erofs + overlay on /data/uhl_overlay]
-    R --> C[chroot to Ubuntu systemd]
-    C --> U[Lomiri + Ubuntu services]
+```text
+Bootloader
+  -> Stock kernel + stock ramdisk init
+  -> Android userspace + vendor HAL services
+  -> /system/etc/init/ubuntu-gsi.rc
+  -> /system/bin/ubuntu-gsi-launcher
+  -> mount rootfs.erofs + overlay on /data/uhl_overlay
+  -> chroot to Ubuntu systemd
+  -> Lomiri + Ubuntu services
 ```
 
 ## Key points
