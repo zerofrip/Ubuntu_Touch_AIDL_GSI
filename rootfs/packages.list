@@ -88,7 +88,6 @@ gstreamer1.0-libcamera
 gstreamer1.0-plugins-base
 gstreamer1.0-plugins-good
 v4l-utils
-# megapixels → lomiri-camera-app で代替
 
 # Power
 upower
