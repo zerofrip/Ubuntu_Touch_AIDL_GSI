@@ -6,6 +6,13 @@
 
 A production-grade Ubuntu Touch distribution that runs natively on Android Treble devices. Uses AIDL-only binder IPC, Mir/Wayland display, and Lomiri shell to deliver a full Linux mobile experience on Android hardware.
 
+## Reference Repositories
+
+The following repositories were referenced to improve device compatibility:
+
+- [device_phh_treble](https://github.com/phhusson/device_phh_treble)
+- [vendor_hardware_overlay](https://github.com/phhusson/vendor_hardware_overlay)
+
 ## Architecture
 
 ```

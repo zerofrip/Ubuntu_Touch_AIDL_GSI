@@ -1,10 +1,12 @@
 #!/bin/bash
 # =============================================================================
-# scripts/detect-vendor-services.sh (Final Master IPC Sanity Matrix & OTA Tracking)
+# scripts/detect-vendor-services.sh — Vendor IPC Readiness Probe
 # =============================================================================
-# Robustly probes the IPC boundary. Implementing a safe retry-loop waiting
-# intelligently allowing Android Bionic limits to spin up.
-# Extracts Vendor Fingerprints forcing Universal Cache Flushes upon OTA natively.
+# PHH-style compatibility probe:
+#   * Tracks vendor fingerprint changes (cache invalidation trigger)
+#   * Validates binder node readiness (/dev/binder, /dev/vndbinder, /dev/hwbinder)
+#   * Best-effort checks service manager surfaces (AIDL service list, lshal)
+#   * Writes machine-readable status to /tmp/binder_state
 # =============================================================================
 
 LOG_FILE="/data/uhl_overlay/hal.log"
@@ -13,50 +15,89 @@ OTA_FINGERPRINT="/data/uhl_overlay/vendor_fingerprint.cache"
 
 mkdir -p /data/uhl_overlay
 touch "$LOG_FILE"
-echo "" >> "$LOG_FILE"
 
-# =============================================================================
-# OTA System Fingerprint Tracker (Cache Flush)
-# =============================================================================
-CURRENT_FINGERPRINT=$(grep "ro.vendor.build.fingerprint" /vendor/build.prop 2>/dev/null | cut -d '=' -f 2)
+log() {
+    echo "[$(date -Iseconds)] [IPC Sanity] $1" >> "$LOG_FILE"
+}
 
-if [ -f "$OTA_FINGERPRINT" ]; then
-    CACHED_FINGERPRINT=$(cat "$OTA_FINGERPRINT")
-    if [ "$CURRENT_FINGERPRINT" != "$CACHED_FINGERPRINT" ]; then
-         echo "[$(date -Iseconds)] [OTA Tracker] WARNING: Android Vendor Fingerprint transformed!" >> "$LOG_FILE"
-         echo "[$(date -Iseconds)] [OTA Tracker] >> ($CACHED_FINGERPRINT) -> ($CURRENT_FINGERPRINT)" >> "$LOG_FILE"
-         echo "[$(date -Iseconds)] [OTA Tracker] Invalidating old Universal GPU/HAL Caches preventing conflicts!" >> "$LOG_FILE"
-         
-         rm -f /data/uhl_overlay/gpu_success.cache
-         echo "$CURRENT_FINGERPRINT" > "$OTA_FINGERPRINT"
-    else
-         echo "[$(date -Iseconds)] [OTA Tracker] Vendor Fingerprint verified safe ($CURRENT_FINGERPRINT)." >> "$LOG_FILE"
+read_vendor_fingerprint() {
+    local fp=""
+    if [ -f /vendor/build.prop ]; then
+        fp=$(grep -m1 '^ro.vendor.build.fingerprint=' /vendor/build.prop 2>/dev/null | cut -d '=' -f 2-)
     fi
-else
-    echo "[$(date -Iseconds)] [OTA Tracker] Discovering Vendor Array inherently..." >> "$LOG_FILE"
-    echo "$CURRENT_FINGERPRINT" > "$OTA_FINGERPRINT"
+    if [ -z "$fp" ] && [ -f /system/vendor/build.prop ]; then
+        fp=$(grep -m1 '^ro.vendor.build.fingerprint=' /system/vendor/build.prop 2>/dev/null | cut -d '=' -f 2-)
+    fi
+    echo "$fp"
+}
+
+current_fp=$(read_vendor_fingerprint)
+if [ -n "$current_fp" ]; then
+    if [ -f "$OTA_FINGERPRINT" ]; then
+        cached_fp=$(cat "$OTA_FINGERPRINT" 2>/dev/null)
+        if [ "$current_fp" != "$cached_fp" ]; then
+            log "Vendor fingerprint changed; invalidating compatibility caches"
+            log "Fingerprint: ($cached_fp) -> ($current_fp)"
+            rm -f /data/uhl_overlay/gpu_success.cache
+            echo "$current_fp" > "$OTA_FINGERPRINT"
+        fi
+    else
+        log "Caching vendor fingerprint for OTA drift detection"
+        echo "$current_fp" > "$OTA_FINGERPRINT"
+    fi
 fi
 
-# =============================================================================
-# IPC Health Array Checks
-# =============================================================================
-echo "[$(date -Iseconds)] [IPC Sanity] Validating Bionic hwservicemanager bindings..." >> "$LOG_FILE"
+max_retries=12
+retry_delay=0.5
+attempt=0
 
-MAX_RETRIES=6
-RETRY_DELAY=0.5
-RETRY_COUNT=0
+aidl_ok=0
+hidl_ok=0
+vnd_ok=0
 
-while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    if [ -c "/dev/hwbinder" ]; then
-        echo "[$(date -Iseconds)] [IPC Sanity] SUCCESS: Hardware Binder natively available (Attempt ${RETRY_COUNT})." >> "$LOG_FILE"
-        echo "IPC_STATUS=ACTIVE" > "$BINDER_STATE"
-        exit 0
+while [ "$attempt" -lt "$max_retries" ]; do
+    [ -c /dev/binder ] && aidl_ok=1
+    [ -c /dev/hwbinder ] && hidl_ok=1
+    [ -c /dev/vndbinder ] && vnd_ok=1
+
+    if [ "$aidl_ok" -eq 1 ] || [ "$hidl_ok" -eq 1 ]; then
+        break
     fi
-    echo "[$(date -Iseconds)] [IPC Sanity] WARN: /dev/hwbinder missing. Retrying in ${RETRY_DELAY}s..." >> "$LOG_FILE"
-    sleep $RETRY_DELAY
-    RETRY_COUNT=$((RETRY_COUNT + 1))
+    attempt=$((attempt + 1))
+    sleep "$retry_delay"
 done
 
-echo "[$(date -Iseconds)] [IPC Sanity] FATAL ERROR: /dev/hwbinder missing after strict Timeout. Android HAL dead." >> "$LOG_FILE"
-echo "IPC_STATUS=DEAD" > "$BINDER_STATE"
+aidl_svc="unknown"
+if command -v service >/dev/null 2>&1 && service list >/dev/null 2>&1; then
+    aidl_svc="ready"
+fi
+
+hidl_svc="unknown"
+if command -v lshal >/dev/null 2>&1; then
+    if lshal -ip >/dev/null 2>&1; then
+        hidl_svc="ready"
+    else
+        hidl_svc="present_but_no_output"
+    fi
+fi
+
+{
+    if [ "$aidl_ok" -eq 1 ] || [ "$hidl_ok" -eq 1 ]; then
+        echo "IPC_STATUS=ACTIVE"
+    else
+        echo "IPC_STATUS=DEAD"
+    fi
+    echo "BINDER_NODE=$aidl_ok"
+    echo "HWBINDER_NODE=$hidl_ok"
+    echo "VNDBINDER_NODE=$vnd_ok"
+    echo "AIDL_SERVICE_MANAGER=$aidl_svc"
+    echo "HIDL_SERVICE_MANAGER=$hidl_svc"
+} > "$BINDER_STATE"
+
+if [ "$aidl_ok" -eq 1 ] || [ "$hidl_ok" -eq 1 ]; then
+    log "Binder nodes ready (binder=$aidl_ok hwbinder=$hidl_ok vndbinder=$vnd_ok)"
+    exit 0
+fi
+
+log "FATAL: no binder-capable IPC node found after retries"
 exit 1

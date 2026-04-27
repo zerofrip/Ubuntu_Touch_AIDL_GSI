@@ -4,7 +4,7 @@
     {
       "name": "power",
       "aidl_interface": "android.hardware.power.IPower",
-      "binary": "/system/aidl/power/power_hal.sh",
+      "binary": "/usr/lib/ubuntu-gsi/aidl/power/power_hal.sh",
       "critical": true,
       "start_delay": 0,
       "description": "Power management — battery, charging, performance profiles"
@@ -12,7 +12,7 @@
     {
       "name": "audio",
       "aidl_interface": "android.hardware.audio.core.IModule",
-      "binary": "/system/aidl/audio/audio_hal.sh",
+      "binary": "/usr/lib/ubuntu-gsi/aidl/audio/audio_hal.sh",
       "critical": false,
       "start_delay": 1,
       "description": "Audio routing via PulseAudio/PipeWire to vendor codec"
@@ -20,7 +20,7 @@
     {
       "name": "camera",
       "aidl_interface": "android.hardware.camera.provider.ICameraProvider",
-      "binary": "/system/aidl/camera/camera_hal.sh",
+      "binary": "/usr/lib/ubuntu-gsi/aidl/camera/camera_hal.sh",
       "critical": false,
       "start_delay": 1,
       "description": "Camera access via libcamera to vendor camera HAL"
@@ -28,7 +28,7 @@
     {
       "name": "sensors",
       "aidl_interface": "android.hardware.sensors.ISensors",
-      "binary": "/system/aidl/sensors/sensors_hal.sh",
+      "binary": "/usr/lib/ubuntu-gsi/aidl/sensors/sensors_hal.sh",
       "critical": false,
       "start_delay": 0,
       "description": "Sensor data via iio-sensor-proxy to vendor sensor HAL"
@@ -36,7 +36,7 @@
     {
       "name": "graphics",
       "aidl_interface": "android.hardware.graphics.composer3.IComposer",
-      "binary": "/system/aidl/graphics/graphics_hal.sh",
+      "binary": "/usr/lib/ubuntu-gsi/aidl/graphics/graphics_hal.sh",
       "critical": true,
       "start_delay": 0,
       "description": "GPU/display via Mir compositor to vendor graphics"
@@ -44,7 +44,7 @@
     {
       "name": "wifi",
       "aidl_interface": "android.hardware.wifi.IWifi",
-      "binary": "/system/aidl/wifi/wifi_hal.sh",
+      "binary": "/usr/lib/ubuntu-gsi/aidl/wifi/wifi_hal.sh",
       "critical": false,
       "start_delay": 2,
       "description": "WiFi via wpa_supplicant/NetworkManager to vendor WiFi driver"
@@ -52,7 +52,7 @@
     {
       "name": "telephony",
       "aidl_interface": "android.hardware.radio.IRadio",
-      "binary": "/system/aidl/telephony/telephony_hal.sh",
+      "binary": "/usr/lib/ubuntu-gsi/aidl/telephony/telephony_hal.sh",
       "critical": false,
       "start_delay": 3,
       "description": "Telephony/SIM via oFono/ModemManager to vendor radio HAL"
@@ -60,7 +60,7 @@
     {
       "name": "input",
       "aidl_interface": "android.hardware.input.IInputProcessor",
-      "binary": "/system/aidl/input/input_hal.sh",
+      "binary": "/usr/lib/ubuntu-gsi/aidl/input/input_hal.sh",
       "critical": false,
       "start_delay": 0,
       "description": "Touchscreen/input via libinput to vendor input drivers"
@@ -68,7 +68,7 @@
     {
       "name": "gnss",
       "aidl_interface": "android.hardware.gnss.IGnss",
-      "binary": "/system/aidl/gnss/gnss_hal.sh",
+      "binary": "/usr/lib/ubuntu-gsi/aidl/gnss/gnss_hal.sh",
       "critical": false,
       "start_delay": 3,
       "description": "GNSS/GPS via gpsd/geoclue to vendor GNSS HAL"
@@ -76,7 +76,7 @@
     {
       "name": "bluetooth",
       "aidl_interface": "android.hardware.bluetooth.IBluetoothHci",
-      "binary": "/system/aidl/bluetooth/bluetooth_hal.sh",
+      "binary": "/usr/lib/ubuntu-gsi/aidl/bluetooth/bluetooth_hal.sh",
       "critical": false,
       "start_delay": 2,
       "description": "Bluetooth via BlueZ to vendor BT firmware"
@@ -84,7 +84,7 @@
     {
       "name": "vibrator",
       "aidl_interface": "android.hardware.vibrator.IVibrator",
-      "binary": "/system/aidl/vibrator/vibrator_hal.sh",
+      "binary": "/usr/lib/ubuntu-gsi/aidl/vibrator/vibrator_hal.sh",
       "critical": false,
       "start_delay": 0,
       "description": "Vibrator via sysfs timed_output/LED/FF input"
@@ -92,7 +92,7 @@
     {
       "name": "fingerprint",
       "aidl_interface": "android.hardware.biometrics.fingerprint.IFingerprint",
-      "binary": "/system/aidl/fingerprint/fingerprint_hal.sh",
+      "binary": "/usr/lib/ubuntu-gsi/aidl/fingerprint/fingerprint_hal.sh",
       "critical": false,
       "start_delay": 2,
       "description": "Fingerprint auth via fprintd/libfprint to vendor fingerprint HAL"
@@ -100,7 +100,7 @@
     {
       "name": "face",
       "aidl_interface": "android.hardware.biometrics.face.IFace",
-      "binary": "/system/aidl/face/face_hal.sh",
+      "binary": "/usr/lib/ubuntu-gsi/aidl/face/face_hal.sh",
       "critical": false,
       "start_delay": 2,
       "description": "Face auth via Howdy/IR camera to vendor face HAL"
