@@ -23,13 +23,15 @@ jobs:
           submodules: false
 
       - name: Install ShellCheck
-        run: sudo apt-get install -y shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
 
       - name: Run ShellCheck
         run: |
           find . -name '*.sh' \
             -not -path './third_party/*' \
             -not -path './builder/out/*' \
+            -not -path './builder/cache/*' \
+            -not -path './deprecated/*' \
             -print0 | xargs -0 shellcheck --severity=warning
 
   build:
@@ -40,6 +42,8 @@ jobs:
       contents: write
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      CI: "true"
+      GSI_CI_MINIMAL_PACKAGES: "1"
     steps:
       - uses: actions/checkout@v5
         with:
@@ -49,30 +53,27 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            squashfs-tools \
             e2fsprogs \
+            erofs-utils \
             jq \
             debootstrap \
-            qemu-user-static
+            qemu-user-static \
+            wget \
+            unzip \
+            xz-utils \
+            android-sdk-libsparse-utils
 
-      - name: Build rootfs with packages.list
+      - name: Build images
         run: |
-          chmod +x scripts/build_rootfs.sh
-          sudo bash scripts/build_rootfs.sh
-
-      - name: Build system.img
-        run: |
-          chmod +x build.sh builder/scripts/*.sh scripts/*.sh
-          # Run build.sh but skip the download phase (rootfs already staged)
-          # sudo required: build_rootfs.sh creates root-owned rootfs
-          sudo ROOTFS_TARBALL_NAME="SKIP" bash build.sh
+          chmod +x build.sh scripts/*.sh
+          sudo -E bash build.sh
 
       - name: Verify artifacts
         run: |
           echo "=== Build Artifacts ==="
-          ls -lh builder/out/system.img || echo "system.img missing"
-          ls -lh builder/out/linux_rootfs.squashfs || echo "squashfs missing"
-          ls -lh builder/out/userdata.img || echo "userdata.img missing"
+          ls -lh builder/out/system.img
+          ls -lh builder/out/linux_rootfs.erofs
+          ls -lh builder/out/vbmeta-disabled.img
 
       - name: Upload workflow artifacts
         if: success()
@@ -81,8 +82,8 @@ jobs:
           name: ubuntu-gsi-${{ github.run_number }}
           path: |
             builder/out/system.img
-            builder/out/linux_rootfs.squashfs
-            builder/out/userdata.img
+            builder/out/linux_rootfs.erofs
+            builder/out/vbmeta-disabled.img
           retention-days: ${{ startsWith(github.ref, 'refs/tags/') && 90 || 7 }}
           if-no-files-found: error
 
@@ -93,25 +94,25 @@ jobs:
           tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.tag }}
           name: Ubuntu GSI ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.tag }}
           body: |
-            ## Ubuntu GSI ${{ github.ref_name }}
+            ## Ubuntu GSI ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.tag }}
 
             ### Artifacts
             | File | Description |
             |------|-------------|
             | `system.img` | Flash to `system` partition via fastboot |
-            | `linux_rootfs.squashfs` | Ubuntu root filesystem (included in userdata.img) |
-            | `userdata.img` | Flash to `userdata` partition via fastboot (auto-expands on first boot) |
+            | `linux_rootfs.erofs` | Ubuntu chroot rootfs payload embedded by system overlay |
+            | `vbmeta-disabled.img` | Flash to `vbmeta` with verity disabled |
 
             ### Flash instructions
             ```sh
+            fastboot --disable-verity --disable-verification flash vbmeta vbmeta-disabled.img
             fastboot flash system system.img
-            fastboot flash userdata userdata.img
             fastboot reboot
             ```
           files: |
             builder/out/system.img
-            builder/out/linux_rootfs.squashfs
-            builder/out/userdata.img
+            builder/out/linux_rootfs.erofs
+            builder/out/vbmeta-disabled.img
           draft: false
           prerelease: ${{ contains(startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.tag, '-') }}
           fail_on_unmatched_files: true
