@@ -1,0 +1,62 @@
+# =============================================================================
+# /system/etc/init/ubuntu-gsi.rc — Halium-style Ubuntu GSI launcher (AIDL)
+# =============================================================================
+# This file is loaded by Android's stock second-stage init after the PHH
+# Treble GSI base finishes its own /system/etc/init/*.rc files.
+#
+# Sequence:
+#   1. As soon as vendor.early.boot is signalled, run the compatibility
+#      engine in "android-mode" (equivalent to phhusson's phh-on-boot.sh).
+#   2. After sys.boot_completed=1 (zygote up, animation done), launch
+#      ubuntu-gsi-launcher which performs the chroot pivot into the
+#      Ubuntu rootfs and starts systemd inside it.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. Compatibility engine, Android side (very early)
+# -----------------------------------------------------------------------------
+service ubuntu-gsi-compat-android /system/usr/lib/ubuntu-gsi/compat/compat-engine.sh android-mode
+    user root
+    group root system
+    seclabel u:r:su:s0
+    oneshot
+    disabled
+
+on property:vendor.early.boot=1
+    start ubuntu-gsi-compat-android
+
+on property:sys.boot_completed=1
+    # Re-run for any actions that depend on framework being up.
+    start ubuntu-gsi-compat-android
+
+# -----------------------------------------------------------------------------
+# 2. Ubuntu chroot launcher (late boot)
+# -----------------------------------------------------------------------------
+service ubuntu-gsi-launcher /system/bin/ubuntu-gsi-launcher
+    user root
+    group root system
+    seclabel u:r:su:s0
+    oneshot
+    disabled
+    stdio_to_kmsg
+
+on property:sys.boot_completed=1 && property:persist.ubuntu_gsi.enable=1
+    start ubuntu-gsi-launcher
+
+on property:sys.boot_completed=1 && property:persist.ubuntu_gsi.enable=
+    # First boot: enable by default and start.
+    setprop persist.ubuntu_gsi.enable 1
+    start ubuntu-gsi-launcher
+
+# -----------------------------------------------------------------------------
+# 3. Bail-out path
+# -----------------------------------------------------------------------------
+# If the launcher exits non-zero we set persist.ubuntu_gsi.failed=1 so the
+# user can boot back to plain Android by:
+#   adb shell setprop persist.ubuntu_gsi.enable 0
+#
+# That property is honoured by the conditions above; on next boot Lomiri
+# will not be started and the user keeps a usable Android.
+
+on property:persist.ubuntu_gsi.failed=1
+    write /sys/kernel/debug/ubuntu_gsi_failed 1

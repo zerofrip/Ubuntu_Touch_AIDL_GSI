@@ -16,6 +16,13 @@
 
 set -u
 
+# Runtime mode: android | linux | both
+COMPAT_MODE="${1:-${COMPAT_MODE:-both}}"
+case "$COMPAT_MODE" in
+    android|linux|both) ;;
+    *) COMPAT_MODE="both" ;;
+esac
+
 # ---------------------------------------------------------------------------
 # Paths & defaults
 # ---------------------------------------------------------------------------
@@ -70,7 +77,7 @@ fi
 : "${COMPAT_SOC_VENDOR:=unknown}"
 : "${COMPAT_VENDOR_FP:=unknown}"
 
-log "Platform: '${COMPAT_PLATFORM}' brand='${COMPAT_BRAND}' model='${COMPAT_MODEL}' soc=${COMPAT_SOC_VENDOR}"
+log "Platform: '${COMPAT_PLATFORM}' brand='${COMPAT_BRAND}' model='${COMPAT_MODEL}' soc=${COMPAT_SOC_VENDOR} mode=${COMPAT_MODE}"
 
 # ---------------------------------------------------------------------------
 # Allow user override (/etc/default/ubuntu-gsi-compat)
@@ -339,6 +346,16 @@ while IFS=$'\x1f' read -r kind f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11; do
             [ "$current_rule_active" = 1 ] || continue
             atype="$f1"; apath="$f2"; aval="$f3"; amod="$f4"; aunit="$f5"
             asrc="$f6"; adst="$f7"; amode="$f8"; akey="$f9"; amsg="$f10"
+
+            # Optional per-action mode filter in quirks.json.
+            # Empty or "both" applies everywhere.
+            action_mode="${amode:-both}"
+            case "$action_mode" in
+                ""|both) : ;;
+                "$COMPAT_MODE") : ;;
+                *) continue ;;
+            esac
+
             case "$atype" in
                 sysfs)            do_sysfs "$apath" "$aval" || true ;;
                 proc)             do_proc  "$apath" "$aval" || true ;;

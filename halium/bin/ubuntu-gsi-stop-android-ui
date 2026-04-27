@@ -1,0 +1,66 @@
+#!/system/bin/sh
+# =============================================================================
+# /system/bin/ubuntu-gsi-stop-android-ui — Free GPU & FB before Mir starts
+# =============================================================================
+# Halts the Android-side display, animation and audio services so the Linux
+# compositor inside the chroot can claim the GPU/DRM/HWC and the audio HAL
+# without resource contention.
+#
+# Vendor HAL services (composer, gralloc, audio, …) are left running because
+# Mir reaches them via libhybris.
+# =============================================================================
+
+set -eu
+
+LOG_TAG="ubuntu-gsi-stop-android-ui"
+log() {
+    log -t "$LOG_TAG" "$*" 2>/dev/null || true
+    echo "[$LOG_TAG] $*" 1>&2
+}
+
+# Comma-separated list of init-managed services we want stopped.
+ANDROID_UI_SERVICES="
+    surfaceflinger
+    bootanim
+    audioserver
+    cameraserver
+    media.swcodec
+    mediaserver
+    statsd
+    vendor.surfaceflinger-1-0
+    inputflinger
+    iorapd
+"
+
+stop_service() {
+    name=$1
+    state=$(getprop "init.svc.${name}" 2>/dev/null || echo "")
+    case "$state" in
+        running|restarting)
+            log "stopping ${name} (was ${state})"
+            setprop "ctl.stop" "${name}" || true
+            ;;
+        stopped|"")
+            ;;
+        *)
+            log "${name} is in unknown state '${state}', sending stop anyway"
+            setprop "ctl.stop" "${name}" || true
+            ;;
+    esac
+}
+
+for s in $ANDROID_UI_SERVICES; do
+    stop_service "$s"
+done
+
+# Disable zygote restart so the framework doesn't keep clawing back the FB.
+setprop persist.sys.boot.disable_zygote 1 || true
+setprop ctl.stop zygote     || true
+setprop ctl.stop zygote_secondary || true
+
+# Drop SurfaceFlinger's dm-verity-protected uid 1000 hold on /dev/dri.
+# (Best-effort; ignored if the device isn't using DRM.)
+chmod 0666 /dev/dri/* 2>/dev/null || true
+
+log "android UI services stopped"
+exit 0

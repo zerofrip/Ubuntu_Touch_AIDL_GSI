@@ -1,0 +1,182 @@
+#!/system/bin/sh
+# =============================================================================
+# /system/bin/ubuntu-gsi-launcher — Halium-style chroot pivot (AIDL variant)
+# =============================================================================
+# Started by /system/etc/init/ubuntu-gsi.rc once
+#
+#   property:sys.boot_completed=1 && property:persist.ubuntu_gsi.enable=1
+#
+# Performs the following pivot:
+#   1. Mount the Ubuntu rootfs.erofs from /system/usr/share/ubuntu-gsi/.
+#   2. Layer overlayfs upper from /data/uhl_overlay/upper on top.
+#   3. Bind-mount Android namespaces (/vendor, /dev, /sys, /proc,
+#      /dev/binderfs, /dev/socket, /data, …) into the merged tree.
+#   4. Stop SurfaceFlinger / bootanim so the GPU and FB are free.
+#   5. nsenter --mount + chroot into the merged tree and exec systemd.
+#
+# Android stays alive underneath: zygote, hwservicemanager, every vendor HAL
+# service and the binder devices keep running inside their original mount
+# namespace. Mir (started by Lomiri inside the chroot) reaches the GPU via
+# libhybris which dlopens the vendor EGL/GLES libraries through bind-mounted
+# /vendor and /system_real.
+#
+# Exit codes:
+#   0   chrooted successfully (this script never returns from a successful exec)
+#   10  rootfs.erofs missing
+#   11  overlayfs assembly failed
+#   12  bind-mount failed
+#   13  switch_root/chroot failed
+# =============================================================================
+
+set -eu
+
+LOG_TAG="ubuntu-gsi-launcher"
+log() {
+    # Send to logcat so journalctl-style debugging works on Android side too.
+    log -t "$LOG_TAG" "$*" 2>/dev/null || true
+    echo "[$LOG_TAG] $*" 1>&2
+}
+
+fail() {
+    rc=$1
+    msg=$2
+    log "FATAL ($rc): $msg"
+    setprop persist.ubuntu_gsi.failed 1 2>/dev/null || true
+    exit "$rc"
+}
+
+# -----------------------------------------------------------------------------
+# Paths & tunables
+# -----------------------------------------------------------------------------
+ROOTFS_EROFS="/system/usr/share/ubuntu-gsi/rootfs.erofs"
+OVERLAY_BASE="/halium/base"
+OVERLAY_UPPER="/data/uhl_overlay/upper"
+OVERLAY_WORK="/data/uhl_overlay/work"
+OVERLAY_MERGED="/halium/merged"
+
+mkdir -p "$OVERLAY_BASE" "$OVERLAY_UPPER" "$OVERLAY_WORK" "$OVERLAY_MERGED" \
+         /halium /data/uhl_overlay 2>/dev/null || true
+
+# Mark this run.
+log "Halium-style launcher starting (AIDL variant)."
+log "  rootfs:   $ROOTFS_EROFS"
+log "  upper:    $OVERLAY_UPPER"
+log "  merged:   $OVERLAY_MERGED"
+
+# -----------------------------------------------------------------------------
+# 1. Erofs base mount
+# -----------------------------------------------------------------------------
+[ -f "$ROOTFS_EROFS" ] || fail 10 "rootfs.erofs not present at $ROOTFS_EROFS"
+
+if ! mountpoint -q "$OVERLAY_BASE"; then
+    log "Mounting rootfs.erofs (read-only) at $OVERLAY_BASE"
+    mount -t erofs -o ro,loop "$ROOTFS_EROFS" "$OVERLAY_BASE" \
+        || fail 10 "erofs mount failed"
+fi
+
+# -----------------------------------------------------------------------------
+# 2. Snapshot rotation (1->2->3, GC > 3) — preserved from the previous arch
+# -----------------------------------------------------------------------------
+SNAP1="/data/uhl_overlay/snapshot.1"
+SNAP2="/data/uhl_overlay/snapshot.2"
+SNAP3="/data/uhl_overlay/snapshot.3"
+
+if [ -f "/data/uhl_overlay/rollback" ]; then
+    log "Rollback trigger detected → restoring snapshot.1"
+    if [ -d "$SNAP1" ]; then
+        rm -rf "$OVERLAY_UPPER" "$OVERLAY_WORK"
+        cp -a "$SNAP1" "$OVERLAY_UPPER"
+        mkdir -p "$OVERLAY_WORK"
+        rm -f /data/uhl_overlay/rollback
+        log "Rollback succeeded"
+    else
+        log "No snapshot.1 — rollback skipped"
+    fi
+else
+    log "Rotating snapshots upper -> snapshot.1 -> 2 -> 3"
+    [ -d "$SNAP3" ] && rm -rf "$SNAP3"
+    [ -d "$SNAP2" ] && mv "$SNAP2" "$SNAP3"
+    [ -d "$SNAP1" ] && mv "$SNAP1" "$SNAP2"
+    [ -d "$OVERLAY_UPPER" ] && cp -a "$OVERLAY_UPPER" "$SNAP1"
+fi
+
+# -----------------------------------------------------------------------------
+# 3. OverlayFS assembly
+# -----------------------------------------------------------------------------
+if ! mountpoint -q "$OVERLAY_MERGED"; then
+    log "Assembling overlayfs"
+    mount -t overlay overlay \
+        -o "lowerdir=$OVERLAY_BASE,upperdir=$OVERLAY_UPPER,workdir=$OVERLAY_WORK" \
+        "$OVERLAY_MERGED" \
+        || fail 11 "overlay assembly failed"
+fi
+
+mountpoint -q "$OVERLAY_MERGED" || fail 11 "overlay validation failed"
+
+# -----------------------------------------------------------------------------
+# 4. Bind Android namespaces into the merged tree
+# -----------------------------------------------------------------------------
+bind() {
+    src=$1; dst=$2; opts=${3:-}
+    [ -e "$src" ] || { log "skip bind $src (missing)"; return 0; }
+    [ -e "$OVERLAY_MERGED$dst" ] || mkdir -p "$OVERLAY_MERGED$dst" 2>/dev/null || true
+    if [ -f "$src" ] && [ ! -d "$src" ]; then
+        : > "$OVERLAY_MERGED$dst" 2>/dev/null || true
+    fi
+    case "$opts" in
+        rec) mount --rbind "$src" "$OVERLAY_MERGED$dst" ;;
+        *)   mount --bind  "$src" "$OVERLAY_MERGED$dst" ;;
+    esac || fail 12 "bind $src -> $dst failed"
+    log "bind $src -> $OVERLAY_MERGED$dst"
+}
+
+bind /vendor       /vendor
+bind /system       /system_real
+bind /dev          /dev          rec
+bind /dev/binderfs /dev/binderfs rec
+bind /proc         /proc         rec
+bind /sys          /sys          rec
+bind /data         /data
+bind /data/uhl_overlay /var/lib/ubuntu-gsi
+[ -d /dev/socket ] && bind /dev/socket /dev/socket rec || true
+[ -d /mnt/vendor  ] && bind /mnt/vendor /mnt/vendor rec || true
+
+# Make sure /halium itself is reachable from inside the chroot so the
+# launcher can find its own log/state for diagnostics.
+[ -d "$OVERLAY_MERGED/halium" ] || mkdir -p "$OVERLAY_MERGED/halium"
+mount --rbind /halium "$OVERLAY_MERGED/halium" || true
+
+# -----------------------------------------------------------------------------
+# 5. Hand the GPU off
+# -----------------------------------------------------------------------------
+if [ -x /system/bin/ubuntu-gsi-stop-android-ui ]; then
+    log "Stopping Android UI services for GPU hand-off"
+    /system/bin/ubuntu-gsi-stop-android-ui || log "ui stop returned non-zero (continuing)"
+fi
+
+# -----------------------------------------------------------------------------
+# 6. Sanity: systemd present?
+# -----------------------------------------------------------------------------
+SYSTEMD="/lib/systemd/systemd"
+if [ ! -x "$OVERLAY_MERGED$SYSTEMD" ]; then
+    fail 13 "systemd missing inside merged tree at $SYSTEMD"
+fi
+
+# -----------------------------------------------------------------------------
+# 7. Pivot.
+#
+#    We use chroot rather than switch_root because Android init must keep
+#    its own root mount; tearing it down would kill HAL services we still
+#    rely on.  The chroot scopes only this process tree.
+#
+#    `nsenter --mount=/proc/self/ns/mnt` is a no-op but documents intent.
+# -----------------------------------------------------------------------------
+log "exec chroot -> systemd"
+setprop persist.ubuntu_gsi.failed 0 2>/dev/null || true
+
+# Pass the absolute log target; systemd will redirect its journal-kmsg
+# stream into the kernel ring buffer where logcat -b kernel can read it.
+exec chroot "$OVERLAY_MERGED" "$SYSTEMD" --log-target=kmsg --unit=graphical.target
+
+# Should never reach here.
+fail 13 "exec returned"
