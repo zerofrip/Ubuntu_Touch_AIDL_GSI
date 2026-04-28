@@ -155,8 +155,8 @@ success "Halium scaffolding overlaid"
 if [ "$SYSTEM_IMG_SIZE_MB" -eq 0 ]; then
     SRC_MB=$(du -sm "$STAGING" | cut -f1)
     SYSTEM_IMG_SIZE_MB=$(( SRC_MB + 256 ))
-    [ "$SYSTEM_IMG_SIZE_MB" -lt 2048 ] && SYSTEM_IMG_SIZE_MB=2048
-    info "Auto system.img size: ${SYSTEM_IMG_SIZE_MB}MB (content ${SRC_MB}MB + 256MB headroom, min 2048MB)"
+    [ "$SYSTEM_IMG_SIZE_MB" -lt 1536 ] && SYSTEM_IMG_SIZE_MB=1536
+    info "Auto system.img size: ${SYSTEM_IMG_SIZE_MB}MB (content ${SRC_MB}MB + 256MB headroom, min 1536MB)"
 fi
 
 rm -f "$OUT_IMG"
