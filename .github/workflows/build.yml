@@ -87,6 +87,28 @@ jobs:
           retention-days: ${{ startsWith(github.ref, 'refs/tags/') && 90 || 7 }}
           if-no-files-found: error
 
+      - name: Prepare release asset list (skip files >= 2GB)
+        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
+        id: release_assets
+        run: |
+          max_size=2147483647
+          assets=""
+          for f in builder/out/system.img builder/out/linux_rootfs.erofs builder/out/vbmeta-disabled.img; do
+            if [ -f "$f" ]; then
+              size=$(stat -c%s "$f")
+              if [ "$size" -le "$max_size" ]; then
+                assets="${assets}${f}\n"
+              else
+                echo "Skipping $f ($size bytes) because GitHub release asset limit is 2GB"
+              fi
+            fi
+          done
+          {
+            echo "files<<EOF"
+            printf "%b" "$assets"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
         uses: softprops/action-gh-release@v2
@@ -103,18 +125,18 @@ jobs:
             | `linux_rootfs.erofs` | Ubuntu chroot rootfs payload embedded by system overlay |
             | `vbmeta-disabled.img` | Flash to `vbmeta` with verity disabled |
 
+            Note: GitHub release assets larger than 2GB are automatically skipped.
+            Use workflow artifacts for full-size files when needed.
+
             ### Flash instructions
             ```sh
             fastboot --disable-verity --disable-verification flash vbmeta vbmeta-disabled.img
             fastboot flash system system.img
             fastboot reboot
             ```
-          files: |
-            builder/out/system.img
-            builder/out/linux_rootfs.erofs
-            builder/out/vbmeta-disabled.img
+          files: ${{ steps.release_assets.outputs.files }}
           draft: false
           prerelease: ${{ contains(startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.tag, '-') }}
-          fail_on_unmatched_files: true
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
