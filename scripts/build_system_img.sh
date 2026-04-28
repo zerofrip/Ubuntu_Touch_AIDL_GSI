@@ -39,6 +39,8 @@ STAGING="$OUT_DIR/system_staging"
 PHH_MNT="$OUT_DIR/.phh-mount"
 
 SYSTEM_IMG_SIZE_MB="${SYSTEM_IMG_SIZE_MB:-0}"
+SYSTEM_IMG_HEADROOM_MB="${SYSTEM_IMG_HEADROOM_MB:-96}"
+SYSTEM_IMG_MIN_MB="${SYSTEM_IMG_MIN_MB:-768}"
 
 mkdir -p "$OUT_DIR"
 
@@ -86,7 +88,7 @@ if [ ! -f "$EROFS_IMG" ]; then
     exit 1
 fi
 
-for cmd in mkfs.ext4 e2fsck mount tune2fs; do
+for cmd in mkfs.ext4 e2fsck resize2fs dumpe2fs mount tune2fs; do
     command -v "$cmd" >/dev/null 2>&1 || {
         error "$cmd not found — install e2fsprogs"
         exit 1
@@ -150,13 +152,13 @@ install -m 0644 "$HALIUM_DIR/lomiri/README.md" \
 success "Halium scaffolding overlaid"
 
 # ---------------------------------------------------------------------------
-# Stage 3: pack ext4
+# Stage 3: pack ext4 (minimal size)
 # ---------------------------------------------------------------------------
 if [ "$SYSTEM_IMG_SIZE_MB" -eq 0 ]; then
     SRC_MB=$(du -sm "$STAGING" | cut -f1)
-    SYSTEM_IMG_SIZE_MB=$(( SRC_MB + 256 ))
-    [ "$SYSTEM_IMG_SIZE_MB" -lt 1536 ] && SYSTEM_IMG_SIZE_MB=1536
-    info "Auto system.img size: ${SYSTEM_IMG_SIZE_MB}MB (content ${SRC_MB}MB + 256MB headroom, min 1536MB)"
+    SYSTEM_IMG_SIZE_MB=$(( SRC_MB + SYSTEM_IMG_HEADROOM_MB ))
+    [ "$SYSTEM_IMG_SIZE_MB" -lt "$SYSTEM_IMG_MIN_MB" ] && SYSTEM_IMG_SIZE_MB="$SYSTEM_IMG_MIN_MB"
+    info "Auto system.img size: ${SYSTEM_IMG_SIZE_MB}MB (content ${SRC_MB}MB + ${SYSTEM_IMG_HEADROOM_MB}MB headroom, min ${SYSTEM_IMG_MIN_MB}MB)"
 fi
 
 rm -f "$OUT_IMG"
@@ -166,8 +168,18 @@ truncate -s "${SYSTEM_IMG_SIZE_MB}M" "$OUT_IMG"
 info "Formatting ext4 with content from $STAGING"
 mkfs.ext4 -L system -O ^metadata_csum -d "$STAGING" "$OUT_IMG"
 
-# Optional: convert to sparse for smaller flash. We leave raw — `fastboot`
-# accepts both formats on modern bootloaders.
+# Shrink filesystem to the minimum possible size so release uploads stay small.
+info "Minimizing ext4 filesystem footprint"
+e2fsck -fy "$OUT_IMG" >/dev/null 2>&1 || true
+resize2fs -M "$OUT_IMG" >/dev/null 2>&1 || true
+
+# Trim image file to exact ext4 geometry after resize2fs -M.
+BLOCK_SIZE=$(dumpe2fs -h "$OUT_IMG" 2>/dev/null | awk -F': *' '/Block size:/ {print $2; exit}')
+BLOCK_COUNT=$(dumpe2fs -h "$OUT_IMG" 2>/dev/null | awk -F': *' '/Block count:/ {print $2; exit}')
+if [[ "$BLOCK_SIZE" =~ ^[0-9]+$ ]] && [[ "$BLOCK_COUNT" =~ ^[0-9]+$ ]]; then
+    FINAL_BYTES=$((BLOCK_SIZE * BLOCK_COUNT))
+    truncate -s "$FINAL_BYTES" "$OUT_IMG"
+fi
 
 # Cleanup staging
 rm -rf "$STAGING"
