@@ -40,7 +40,11 @@ if [ -f "$SCRIPT_DIR/scripts/check_environment.sh" ]; then
     echo ""
 fi
 
-info "Phase 1 — Fetching PHH Treble GSI base"
+info "Phase 0.5 — Syncing device_phh_treble (${DEVICE_PHH_BRANCH:-auto})"
+bash "$SCRIPT_DIR/scripts/sync_device_phh.sh"
+echo ""
+
+info "Phase 1 — Fetching PHH Treble GSI base (${VENDOR_ANDROID_VERSION})"
 bash "$SCRIPT_DIR/scripts/fetch_phh_gsi.sh"
 echo ""
 
@@ -89,6 +93,10 @@ else
 fi
 echo ""
 
+info "Phase 7 — Packaging release artifacts (${RELEASE_SYSTEM_IMG})"
+bash "$SCRIPT_DIR/scripts/package_release_artifacts.sh"
+echo ""
+
 BUILD_END=$(date +%s)
 ELAPSED=$((BUILD_END - BUILD_START))
 ELAPSED_MIN=$((ELAPSED / 60))
@@ -100,7 +108,7 @@ echo -e "${BOLD}═════════════════════�
 echo ""
 
 OUT="$WORKSPACE_DIR/builder/out"
-for f in system.img vbmeta-disabled.img linux_rootfs.erofs userdata.img; do
+for f in "$RELEASE_SYSTEM_IMG" vbmeta-disabled.img linux_rootfs.erofs userdata.img system.img; do
     if [ -f "$OUT/$f" ]; then
         SZ=$(du -h "$OUT/$f" | cut -f1)
         echo -e "  ${CYAN}$(printf '%-22s' "$f")${NC}: $SZ"
@@ -112,7 +120,8 @@ echo -e "  Elapsed: ${BOLD}${ELAPSED_MIN}m ${ELAPSED_SEC}s${NC}"
 echo ""
 echo -e "  ${BOLD}Deploy:${NC}"
 echo -e "    fastboot --disable-verity --disable-verification flash vbmeta $OUT/vbmeta-disabled.img"
-echo -e "    fastboot flash system $OUT/system.img"
+echo -e "    fastboot flash system $OUT/${RELEASE_SYSTEM_IMG:-system.img}"
+echo -e "    fastboot flash userdata $OUT/userdata.img"
 echo -e "    fastboot reboot"
 echo -e "    ${CYAN}— or run: make flash${NC}"
 echo -e "${BOLD}═══════════════════════════════════════════════════════════════${NC}"

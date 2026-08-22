@@ -14,15 +14,17 @@ if [ -f "$CONFIG_FILE" ]; then
     source "$CONFIG_FILE"
 fi
 
-PHH_GSI_VERSION="${PHH_GSI_VERSION:-v559}"
-PHH_GSI_VARIANT="${PHH_GSI_VARIANT:-arm64-ab-vanilla}"
+PHH_GSI_VERSION="${PHH_GSI_VERSION:-}"
+PHH_GSI_VARIANT="${PHH_GSI_VARIANT:-td-arm64-ab-vanilla}"
 PHH_GSI_REPO="${PHH_GSI_REPO:-TrebleDroid/treble_experimentations}"
 PHH_GSI_URL="${PHH_GSI_URL:-https://github.com/${PHH_GSI_REPO}/releases/download/${PHH_GSI_VERSION}/system-${PHH_GSI_VARIANT}.img.xz}"
 PHH_GSI_SOURCE="${PHH_GSI_SOURCE:-release}"
+VENDOR_ANDROID_VERSION="${VENDOR_ANDROID_VERSION:-unknown}"
 
 CACHE_DIR="$REPO_ROOT/builder/cache"
-PHH_IMG="$CACHE_DIR/phh-gsi.img"
-PHH_DOWNLOAD="$CACHE_DIR/phh-gsi.img.download"
+PHH_IMG="$CACHE_DIR/phh-gsi-${VENDOR_ANDROID_VERSION}.img"
+PHH_SYMLINK="$CACHE_DIR/phh-gsi.img"
+PHH_DOWNLOAD="$CACHE_DIR/phh-gsi-${VENDOR_ANDROID_VERSION}.img.download"
 
 mkdir -p "$CACHE_DIR"
 
@@ -70,9 +72,15 @@ EOP
 }
 
 if [ -f "$PHH_IMG" ]; then
+    ln -sfn "$(basename "$PHH_IMG")" "$PHH_SYMLINK"
     SIZE=$(du -h "$PHH_IMG" | cut -f1)
     success "Cached PHH GSI present: $PHH_IMG ($SIZE) — skipping download"
     exit 0
+fi
+
+if [ -z "$PHH_GSI_VERSION" ]; then
+    error "PHH_GSI_VERSION is not set. Checkout an android-* branch or set vendor config."
+    exit 1
 fi
 
 if [ "$PHH_GSI_SOURCE" = "custom" ]; then
@@ -83,6 +91,7 @@ fi
 if [ -n "${PHH_GSI_LOCAL:-}" ] && [ -f "$PHH_GSI_LOCAL" ]; then
     info "Using locally provided PHH GSI: $PHH_GSI_LOCAL"
     cp -f "$PHH_GSI_LOCAL" "$PHH_IMG"
+    ln -sfn "$(basename "$PHH_IMG")" "$PHH_SYMLINK"
     success "Cached at $PHH_IMG"
     exit 0
 fi
@@ -97,8 +106,8 @@ info "  version  : $PHH_GSI_VERSION"
 info "  variant  : $PHH_GSI_VARIANT"
 info "  url      : $PHH_GSI_URL"
 
-if [[ "$PHH_GSI_VARIANT" != *"arm64-ab"* && "$PHH_GSI_VARIANT" != td-arm64-* ]]; then
-    error "Only arm64 A/B style variants are supported. Current: $PHH_GSI_VARIANT"
+if [[ "$PHH_GSI_VARIANT" != *"arm64-ab"* && "$PHH_GSI_VARIANT" != td-arm64-* && "$PHH_GSI_VARIANT" != *"arm64-vanilla"* ]]; then
+    error "Only arm64 A/B or td-arm64-vanilla style variants are supported. Current: $PHH_GSI_VARIANT"
     exit 1
 fi
 
@@ -168,4 +177,5 @@ case "$HEAD" in
 esac
 
 SIZE=$(du -h "$PHH_IMG" | cut -f1)
+ln -sfn "$(basename "$PHH_IMG")" "$PHH_SYMLINK"
 success "PHH GSI ready: $PHH_IMG ($SIZE)"

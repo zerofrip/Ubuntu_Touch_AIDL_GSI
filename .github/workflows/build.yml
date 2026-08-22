@@ -2,10 +2,20 @@ name: Build Ubuntu GSI
 
 on:
   push:
-    branches: [main]
+    branches:
+      - android-12.0
+      - android-13.0
+      - android-14.0
+      - android-15.0
+      - android-16.0
     tags: ['v*']
   pull_request:
-    branches: [main]
+    branches:
+      - android-12.0
+      - android-13.0
+      - android-14.0
+      - android-15.0
+      - android-16.0
   workflow_dispatch:
     inputs:
       tag:
@@ -49,6 +59,21 @@ jobs:
         with:
           submodules: false
 
+      - name: Resolve vendor branch and release artifact name
+        id: vendor
+        run: |
+          branch="${GITHUB_REF_NAME}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            branch="${{ github.base_ref }}"
+          fi
+          case "$branch" in
+            android-12.0|android-13.0|android-14.0|android-15.0|android-16.0) ;;
+            v*) branch="android-16.0" ;;
+            *) echo "Unsupported branch for build: $branch"; exit 1 ;;
+          esac
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "system_img=${branch}_system.img" >> "$GITHUB_OUTPUT"
+
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -64,36 +89,44 @@ jobs:
             android-sdk-libsparse-utils
 
       - name: Build images
+        env:
+          VENDOR_ANDROID_VERSION: ${{ steps.vendor.outputs.branch }}
         run: |
           chmod +x build.sh scripts/*.sh
           sudo -E bash build.sh
 
       - name: Verify artifacts
+        env:
+          SYSTEM_IMG: ${{ steps.vendor.outputs.system_img }}
         run: |
-          echo "=== Build Artifacts ==="
-          ls -lh builder/out/system.img
-          ls -lh builder/out/linux_rootfs.erofs
+          echo "=== Build Artifacts (${{ steps.vendor.outputs.branch }}) ==="
+          ls -lh "builder/out/${SYSTEM_IMG}"
+          ls -lh builder/out/userdata.img
           ls -lh builder/out/vbmeta-disabled.img
+          ls -lh builder/out/linux_rootfs.erofs
 
       - name: Upload workflow artifacts
         if: success()
         uses: actions/upload-artifact@v7
         with:
-          name: ubuntu-gsi-${{ github.run_number }}
+          name: ubuntu-gsi-${{ steps.vendor.outputs.branch }}-${{ github.run_number }}
           path: |
-            builder/out/system.img
-            builder/out/linux_rootfs.erofs
+            builder/out/${{ steps.vendor.outputs.system_img }}
+            builder/out/userdata.img
             builder/out/vbmeta-disabled.img
+            builder/out/linux_rootfs.erofs
           retention-days: ${{ startsWith(github.ref, 'refs/tags/') && 90 || 7 }}
           if-no-files-found: error
 
       - name: Prepare release asset list (skip files >= 2GB)
         if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
         id: release_assets
+        env:
+          SYSTEM_IMG: ${{ steps.vendor.outputs.system_img }}
         run: |
           max_size=2147483647
           assets=""
-          for f in builder/out/system.img builder/out/linux_rootfs.erofs builder/out/vbmeta-disabled.img; do
+          for f in "builder/out/${SYSTEM_IMG}" builder/out/userdata.img builder/out/vbmeta-disabled.img; do
             if [ -f "$f" ]; then
               size=$(stat -c%s "$f")
               if [ "$size" -le "$max_size" ]; then
@@ -114,15 +147,17 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.tag }}
-          name: Ubuntu GSI ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.tag }}
+          name: Ubuntu GSI ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.tag }} (${{ steps.vendor.outputs.branch }})
           body: |
             ## Ubuntu GSI ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.tag }}
+
+            **Vendor target branch:** `${{ steps.vendor.outputs.branch }}`
 
             ### Artifacts
             | File | Description |
             |------|-------------|
-            | `system.img` | Flash to `system` partition via fastboot |
-            | `linux_rootfs.erofs` | Ubuntu chroot rootfs payload embedded by system overlay |
+            | `${{ steps.vendor.outputs.system_img }}` | Flash to `system` partition via fastboot |
+            | `userdata.img` | Seeds `/data/ubuntu-gsi/rootfs.erofs` for the Ubuntu launcher |
             | `vbmeta-disabled.img` | Flash to `vbmeta` with verity disabled |
 
             Note: GitHub release assets larger than 2GB are automatically skipped.
@@ -131,7 +166,8 @@ jobs:
             ### Flash instructions
             ```sh
             fastboot --disable-verity --disable-verification flash vbmeta vbmeta-disabled.img
-            fastboot flash system system.img
+            fastboot flash system ${{ steps.vendor.outputs.system_img }}
+            fastboot flash userdata userdata.img
             fastboot reboot
             ```
           files: ${{ steps.release_assets.outputs.files }}

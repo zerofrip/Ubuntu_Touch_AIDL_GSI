@@ -4,7 +4,7 @@
 
 .DEFAULT_GOAL := help
 
-.PHONY: help all build build-minimal build-android8-16 phh phh-custom phh-custom-minimal rootfs rootfs-minimal erofs vbmeta system userdata flash flash-system flash-vbmeta \
+.PHONY: help all build build-minimal build-android8-16 phh phh-custom phh-custom-minimal rootfs rootfs-minimal erofs vbmeta system userdata release flash flash-system flash-vbmeta \
         check check-device clean lint deepclean gui-install
 
 help: ## Show available targets
@@ -17,13 +17,13 @@ help: ## Show available targets
 
 all: build ## Build everything
 
-build: ## Full pipeline: phh -> rootfs -> erofs -> vbmeta -> system
+build: ## Full pipeline: phh -> rootfs -> erofs -> vbmeta -> system -> userdata -> release package
 	@bash build.sh
 
 build-minimal: ## Full pipeline with minimal rootfs profile
 	@GSI_ROOTFS_PROFILE=minimal bash build.sh
 
-build-android8-16: ## Run Android 8-16 AIDL matrix build script
+build-android8-16: ## Build android-12.0 through android-16.0 vendor branches sequentially
 	@bash scripts/build_android8_to16_aidl.sh
 
 phh: ## Fetch the PHH Treble GSI base
@@ -53,6 +53,9 @@ system: ## Compose system.img (requires sudo for loop-mount)
 userdata: ## Build userdata.img containing rootfs.erofs A/B seed
 	@bash scripts/build_userdata_img.sh
 
+release: ## Package versioned release artifacts (android-XX_system.img)
+	@bash scripts/package_release_artifacts.sh
+
 flash: ## Flash system + vbmeta-disabled + userdata (with size checks)
 	@bash scripts/flash.sh
 
@@ -79,9 +82,10 @@ lint: ## Run shellcheck on shell scripts
 		echo "All scripts passed." || \
 		(echo "ShellCheck found issues."; exit 1)
 
-clean: ## Remove build artifacts (keep PHH cache)
+clean: ## Remove build artifacts (keep versioned PHH cache)
 	@echo "Cleaning build artifacts..."
 	rm -f builder/out/system.img
+	rm -f builder/out/android-*_system.img
 	rm -f builder/out/linux_rootfs.erofs
 	rm -f builder/out/vbmeta-disabled.img
 	rm -f builder/out/userdata.img

@@ -6,14 +6,31 @@
 
 Ubuntu Touch for Treble devices with **AIDL-era vendor stacks** (Android 12+), redesigned to keep stock boot components untouched.
 
+Build and release images from **vendor-version branches** (`android-12.0` … `android-16.0`). The `main` branch is documentation-only.
+
+## Vendor Branch Strategy
+
+| Branch | Target vendor Android | TrebleDroid release | PHH variant |
+|--------|----------------------|---------------------|-------------|
+| `android-12.0` | 12 | `v416` (phhusson) | `squeak-arm64-ab-vanilla` |
+| `android-13.0` | 13 | `ci-20230905` | `td-arm64-ab-vanilla` |
+| `android-14.0` | 14 | `ci-20240508` | `td-arm64-ab-vanilla` |
+| `android-15.0` | 15 | `ci-20250415` | `td-arm64-ab-vanilla` |
+| `android-16.0` | 16 | `ci-20250617` | `td-arm64-vanilla` |
+
+For **HEADWOLF F8** (Android 16 / MT6897), use the **`android-16.0`** branch.
+
+TrebleDroid references: [treble_experimentations releases](https://github.com/TrebleDroid/treble_experimentations/releases), [device_phh_treble](https://github.com/TrebleDroid/device_phh_treble).
+
 ## Design Goals
 
 - Keep **stock `boot.img`** untouched.
 - Keep **stock kernel** untouched.
 - Flash only:
-  - `system.img`
+  - `android-XX_system.img` (versioned system image)
   - `vbmeta-disabled.img`
-- Do not flash `boot`, `vendor_boot`, `dtbo`, `vendor`, or `userdata`.
+  - `userdata.img` (seeds `/data/ubuntu-gsi/rootfs.erofs`)
+- Do not flash `boot`, `vendor_boot`, `dtbo`, or `vendor`.
 
 ## Current Architecture (Halium-style)
 
@@ -60,19 +77,23 @@ sudo apt install \
 ```bash
 git clone --recursive https://github.com/zerofrip/Ubuntu_Touch_AIDL_GSI.git
 cd Ubuntu_Touch_AIDL_GSI
+git checkout android-16.0   # pick branch matching your vendor Android version
 
-make build
+make build-minimal
 ```
 
 Pipeline:
 
-- PHH fetch -> rootfs build -> erofs pack -> vbmeta-disabled -> system image compose
+- device_phh sync -> PHH fetch -> rootfs build -> erofs pack -> vbmeta-disabled -> system image compose -> userdata -> release packaging
 
-Artifacts are generated under `builder/out/`:
+Release artifacts under `builder/out/`:
 
-- `system.img`
-- `linux_rootfs.erofs`
+- `android-XX_system.img` (e.g. `android-16.0_system.img`)
+- `userdata.img`
 - `vbmeta-disabled.img`
+- `linux_rootfs.erofs` (intermediate)
+
+`main` does not build release images. Checkout an `android-*` branch first.
 
 ## Flash
 
@@ -84,7 +105,8 @@ or manually:
 
 ```bash
 fastboot --disable-verity --disable-verification flash vbmeta builder/out/vbmeta-disabled.img
-fastboot flash system builder/out/system.img
+fastboot flash system builder/out/android-16.0_system.img
+fastboot flash userdata builder/out/userdata.img
 fastboot reboot
 ```
 
@@ -129,16 +151,18 @@ Engine supports mode-aware execution (`android`, `linux`, `both`) for per-action
 
 ## AIDL Variant Defaults
 
-`config.env` defaults:
+Per-branch settings live in `vendor/android-XX.Y.env` and are loaded automatically from the git branch name (or `VENDOR_ANDROID_VERSION`).
 
-- `PHH_GSI_SOURCE=release`
+Example (`vendor/android-16.0.env`):
+
 - `PHH_GSI_REPO=TrebleDroid/treble_experimentations`
-- `PHH_GSI_VERSION=v559`
-- `PHH_GSI_VARIANT=arm64-ab-vanilla`
+- `PHH_GSI_VERSION=ci-20250617`
+- `PHH_GSI_VARIANT=td-arm64-vanilla`
+- `RELEASE_SYSTEM_IMG=android-16.0_system.img`
 
-Only `arm64 A/B` (dynamic partition) PHH variants are supported.
+Supported PHH variants: `arm64-ab*`, `td-arm64-ab-vanilla`, and `td-arm64-vanilla` (Android 16).
 
-Override in `config.env` or via environment variables if your target requires a different base.
+Override in `vendor/*.env` or via environment variables if your target requires a different base.
 
 Local source build mode:
 

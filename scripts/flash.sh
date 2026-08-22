@@ -18,7 +18,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 BUILD_DIR="$REPO_ROOT/builder/out"
 
-SYSTEM_IMG="$BUILD_DIR/system.img"
+CONFIG_FILE="$REPO_ROOT/config.env"
+if [ -f "$CONFIG_FILE" ]; then
+    # shellcheck source=/dev/null
+    source "$CONFIG_FILE"
+fi
+
+SYSTEM_IMG="$BUILD_DIR/${RELEASE_SYSTEM_IMG:-system.img}"
+if [ ! -f "$SYSTEM_IMG" ] && [ -f "$BUILD_DIR/system.img" ]; then
+    SYSTEM_IMG="$BUILD_DIR/system.img"
+fi
 VBMETA_IMG="$BUILD_DIR/vbmeta-disabled.img"
 USERDATA_IMG="$BUILD_DIR/userdata.img"
 
@@ -255,3 +264,4 @@ fi
 
 success "Flash complete"
 echo "To disable Ubuntu launcher: adb shell setprop persist.ubuntu_gsi.enable 0 && adb reboot"
+
