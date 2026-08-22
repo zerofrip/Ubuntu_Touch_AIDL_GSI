@@ -1,0 +1,50 @@
+# =============================================================================
+# rootfs/packages.minimal.list — Ubuntu GSI minimal footprint preset
+# =============================================================================
+
+# Core runtime
+systemd
+systemd-sysv
+dbus
+udev
+bash
+sudo
+locales
+ca-certificates
+
+# Connectivity baseline
+network-manager
+iproute2
+wpasupplicant
+openssh-server
+
+# Audio baseline
+pulseaudio
+pulseaudio-utils
+alsa-utils
+libasound2
+
+# Display baseline
+libdrm2
+libgbm1
+libegl1-mesa
+libgles2-mesa
+libwayland-client0
+libwayland-server0
+
+# Core Lomiri stack only
+lomiri
+lomiri-session
+lomiri-system-compositor
+lomiri-keyboard
+lomiri-indicator-network
+lomiri-indicator-power
+lomiri-indicator-sound
+lomiri-system-settings
+
+# Basic tools
+curl
+jq
+nano
+less
+e2fsprogs

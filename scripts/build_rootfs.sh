@@ -19,6 +19,16 @@ ARCH="${ARCH:-arm64}"
 SUITE="${UBUNTU_SUITE:-focal}"
 MIRROR="${UBUNTU_MIRROR:-http://ports.ubuntu.com/ubuntu-ports}"
 PACKAGES_FILE="$REPO_ROOT/rootfs/packages.list"
+ROOTFS_PROFILE="${GSI_ROOTFS_PROFILE:-full}"
+if [ "$ROOTFS_PROFILE" = "minimal" ]; then
+    PACKAGES_FILE="$REPO_ROOT/rootfs/packages.minimal.list"
+fi
+ROOTFS_PRUNE_LEVEL="${GSI_ROOTFS_PRUNE_LEVEL:-}"
+if [ -z "$ROOTFS_PRUNE_LEVEL" ] && [ "$ROOTFS_PROFILE" = "minimal" ]; then
+    ROOTFS_PRUNE_LEVEL="aggressive"
+fi
+ROOTFS_PROFILE_FILE="$TARGET_DIR/.gsi-rootfs-profile"
+FORCE_REBUILD_ROOTFS="${GSI_FORCE_REBUILD_ROOTFS:-0}"
 OVERLAY_DIR="$REPO_ROOT/rootfs/overlay"
 SYSTEMD_DIR="$REPO_ROOT/rootfs/systemd"
 HALIUM_DIR="$REPO_ROOT/halium"
@@ -71,13 +81,31 @@ info "Variant      : $VARIANT"
 info "Architecture : $ARCH"
 info "Suite        : $SUITE"
 info "Target       : $TARGET_DIR"
+[ "$ROOTFS_PROFILE" = "minimal" ] && info "Profile      : minimal"
+[ -n "$ROOTFS_PRUNE_LEVEL" ] && info "Prune level  : $ROOTFS_PRUNE_LEVEL"
 [ -n "$CI_MINIMAL_PACKAGES" ] && info "CI mode      : minimal package set"
 echo ""
 
 info "Phase 1 — Debootstrap ($SUITE for $ARCH)"
+if [ "$FORCE_REBUILD_ROOTFS" = "1" ] && [ -d "$TARGET_DIR" ]; then
+    info "GSI_FORCE_REBUILD_ROOTFS=1 — removing existing rootfs"
+    rm -rf "$TARGET_DIR"
+fi
+
 if [ -d "$TARGET_DIR" ] && [ -f "$TARGET_DIR/etc/os-release" ]; then
-    info "Existing rootfs detected — skipping debootstrap"
-else
+    PREV_PROFILE=""
+    if [ -f "$ROOTFS_PROFILE_FILE" ]; then
+        PREV_PROFILE="$(tr -d '[:space:]' < "$ROOTFS_PROFILE_FILE")"
+    fi
+    if [ "$PREV_PROFILE" != "$ROOTFS_PROFILE" ]; then
+        info "Rootfs profile changed ($PREV_PROFILE -> $ROOTFS_PROFILE) — rebuilding rootfs"
+        rm -rf "$TARGET_DIR"
+    else
+        info "Existing rootfs detected — skipping debootstrap"
+    fi
+fi
+
+if [ ! -d "$TARGET_DIR" ] || [ ! -f "$TARGET_DIR/etc/os-release" ]; then
     rm -rf "$TARGET_DIR"
     mkdir -p "$TARGET_DIR"
 
@@ -97,10 +125,18 @@ else
     debootstrap $DEBOOTSTRAP_OPTS "$SUITE" "$TARGET_DIR" "$MIRROR"
 
     if echo "$DEBOOTSTRAP_OPTS" | grep -q "foreign"; then
-        if [ -f "/usr/bin/qemu-${QEMU_ARCH}-static" ]; then
-            cp "/usr/bin/qemu-${QEMU_ARCH}-static" "$TARGET_DIR/usr/bin/"
+        QEMU_STATIC="/usr/bin/qemu-${QEMU_ARCH}-static"
+        if [ -f "$QEMU_STATIC" ]; then
+            cp "$QEMU_STATIC" "$TARGET_DIR/usr/bin/"
+        else
+            error "$QEMU_STATIC not found. Install qemu-user-static."
+            exit 1
         fi
-        chroot "$TARGET_DIR" /debootstrap/debootstrap --second-stage
+
+        if ! chroot "$TARGET_DIR" /debootstrap/debootstrap --second-stage; then
+            info "Second stage failed (likely missing binfmt); retrying via explicit qemu"
+            chroot "$TARGET_DIR" "/usr/bin/qemu-${QEMU_ARCH}-static" /bin/sh /debootstrap/debootstrap --second-stage
+        fi
     fi
 
     success "Debootstrap complete"
@@ -155,6 +191,26 @@ chroot "$TARGET_DIR" bash -c "
     apt-get clean
     rm -rf /var/lib/apt/lists/*
 "
+
+if [ -n "$ROOTFS_PRUNE_LEVEL" ]; then
+    info "Applying rootfs prune rules ($ROOTFS_PRUNE_LEVEL)"
+    chroot "$TARGET_DIR" bash -c "
+        set -e
+        case \"$ROOTFS_PRUNE_LEVEL\" in
+            aggressive)
+                rm -rf /usr/share/doc/* /usr/share/man/* /usr/share/info/* /usr/share/lintian/* /usr/share/bug/*
+                find /usr/share/locale -mindepth 1 -maxdepth 1 -type d \
+                    ! -name 'en' ! -name 'en_US' ! -name 'en_US.UTF-8' ! -name 'ja' ! -name 'ja_JP' ! -name 'ja_JP.UTF-8' \
+                    -exec rm -rf {} +
+                ;;
+            standard)
+                rm -rf /usr/share/doc/* /usr/share/man/*
+                ;;
+            *)
+                ;;
+        esac
+    "
+fi
 
 umount "$TARGET_DIR/sys"     2>/dev/null || true
 umount "$TARGET_DIR/proc"    2>/dev/null || true
@@ -215,7 +271,10 @@ GSI_BUILD_DATE=$(date -Iseconds)
 GSI_UBUNTU_SUITE=$SUITE
 GSI_ARCH=$ARCH
 GSI_ARCH_MODEL=halium-inverse
+GSI_ROOTFS_PROFILE=$ROOTFS_PROFILE
 EOF3
+
+echo "$ROOTFS_PROFILE" > "$ROOTFS_PROFILE_FILE"
 
 success "Fingerprint written to /etc/ubuntu-gsi-release"
 echo ""

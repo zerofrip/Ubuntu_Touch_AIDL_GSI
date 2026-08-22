@@ -48,14 +48,99 @@ fail() {
 # -----------------------------------------------------------------------------
 # Paths & tunables
 # -----------------------------------------------------------------------------
-ROOTFS_EROFS="/system/usr/share/ubuntu-gsi/rootfs.erofs"
+SYSTEM_ROOTFS_EROFS="/system/usr/share/ubuntu-gsi/rootfs.erofs"
+SYSTEM_ROOTFS_SHA256_FILE="/system/usr/share/ubuntu-gsi/rootfs.erofs.sha256"
+DATA_ROOTFS_DIR="/data/ubuntu-gsi"
+ROOTFS_EROFS="$DATA_ROOTFS_DIR/rootfs.erofs"
+ROOTFS_EROFS_BAK="$DATA_ROOTFS_DIR/rootfs.erofs.bak"
+ROOTFS_EROFS_SHA256_FILE="$DATA_ROOTFS_DIR/rootfs.erofs.sha256"
+FIRSTBOOT_MARKER="/data/uhl_overlay/.firstboot_complete"
+SETUP_WIZARD_PENDING="/data/uhl_overlay/.setup_wizard_pending"
 OVERLAY_BASE="/halium/base"
 OVERLAY_UPPER="/data/uhl_overlay/upper"
 OVERLAY_WORK="/data/uhl_overlay/work"
 OVERLAY_MERGED="/halium/merged"
 
 mkdir -p "$OVERLAY_BASE" "$OVERLAY_UPPER" "$OVERLAY_WORK" "$OVERLAY_MERGED" \
-         /halium /data/uhl_overlay 2>/dev/null || true
+         /halium /data/uhl_overlay "$DATA_ROOTFS_DIR" 2>/dev/null || true
+
+sha256_bin() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        echo "sha256sum"
+        return 0
+    fi
+    if command -v toybox >/dev/null 2>&1; then
+        echo "toybox sha256sum"
+        return 0
+    fi
+    return 1
+}
+
+hash_file() {
+    _f="$1"
+    _bin="$(sha256_bin 2>/dev/null || true)"
+    [ -n "$_bin" ] || return 1
+    $_bin "$_f" 2>/dev/null | awk '{print $1}'
+}
+
+expected_rootfs_hash() {
+    if [ -f "$ROOTFS_EROFS_SHA256_FILE" ]; then
+        awk '{print $1}' "$ROOTFS_EROFS_SHA256_FILE" 2>/dev/null | head -n 1
+        return 0
+    fi
+    if [ -f "$SYSTEM_ROOTFS_SHA256_FILE" ]; then
+        awk '{print $1}' "$SYSTEM_ROOTFS_SHA256_FILE" 2>/dev/null | head -n 1
+        return 0
+    fi
+    hash_file "$SYSTEM_ROOTFS_EROFS" || true
+}
+
+rootfs_valid() {
+    _f="$1"
+    [ -f "$_f" ] || return 1
+    _exp="$(expected_rootfs_hash)"
+    [ -n "$_exp" ] || return 0
+    _got="$(hash_file "$_f" || true)"
+    [ -n "$_got" ] || return 1
+    [ "$_got" = "$_exp" ]
+}
+
+write_hash_file() {
+    _f="$1"
+    _hash="$(hash_file "$_f" || true)"
+    [ -n "$_hash" ] || return 0
+    echo "$_hash  rootfs.erofs" > "$ROOTFS_EROFS_SHA256_FILE"
+}
+
+restore_rootfs_from_system() {
+    if [ ! -f "$SYSTEM_ROOTFS_EROFS" ]; then
+        fail 10 "system seed rootfs missing at $SYSTEM_ROOTFS_EROFS (enable ROOTFS_SEED_IN_SYSTEM=1 or pre-provision /data/ubuntu-gsi/rootfs.erofs)"
+    fi
+    log "Restoring userdata rootfs from system seed"
+    cp -f "$SYSTEM_ROOTFS_EROFS" "$ROOTFS_EROFS" || fail 10 "failed to restore rootfs from system seed"
+    cp -f "$ROOTFS_EROFS" "$ROOTFS_EROFS_BAK" || true
+    write_hash_file "$ROOTFS_EROFS"
+}
+
+ensure_userdata_rootfs() {
+    if rootfs_valid "$ROOTFS_EROFS"; then
+        log "Primary userdata rootfs is valid"
+        [ -f "$ROOTFS_EROFS_BAK" ] || cp -f "$ROOTFS_EROFS" "$ROOTFS_EROFS_BAK" || true
+        write_hash_file "$ROOTFS_EROFS"
+        return 0
+    fi
+
+    log "Primary userdata rootfs missing/corrupt, trying backup"
+    if rootfs_valid "$ROOTFS_EROFS_BAK"; then
+        cp -f "$ROOTFS_EROFS_BAK" "$ROOTFS_EROFS" || fail 10 "failed to restore primary rootfs from backup"
+        write_hash_file "$ROOTFS_EROFS"
+        log "Restored primary userdata rootfs from backup"
+        return 0
+    fi
+
+    log "Backup rootfs missing/corrupt, restoring from system seed"
+    restore_rootfs_from_system
+}
 
 # Mark this run.
 log "Halium-style launcher starting (AIDL variant)."
@@ -64,9 +149,18 @@ log "  upper:    $OVERLAY_UPPER"
 log "  merged:   $OVERLAY_MERGED"
 
 # -----------------------------------------------------------------------------
-# 1. Erofs base mount
+# 1. Rootfs A/B self-heal on userdata + initial setup trigger
 # -----------------------------------------------------------------------------
-[ -f "$ROOTFS_EROFS" ] || fail 10 "rootfs.erofs not present at $ROOTFS_EROFS"
+ensure_userdata_rootfs
+
+if [ ! -f "$FIRSTBOOT_MARKER" ]; then
+    log "First-boot marker missing — scheduling setup wizard"
+    touch "$SETUP_WIZARD_PENDING" 2>/dev/null || true
+fi
+
+# -----------------------------------------------------------------------------
+# 2. Erofs base mount
+# -----------------------------------------------------------------------------
 
 if ! mountpoint -q "$OVERLAY_BASE"; then
     log "Mounting rootfs.erofs (read-only) at $OVERLAY_BASE"
@@ -75,7 +169,7 @@ if ! mountpoint -q "$OVERLAY_BASE"; then
 fi
 
 # -----------------------------------------------------------------------------
-# 2. Snapshot rotation (1->2->3, GC > 3) — preserved from the previous arch
+# 3. Snapshot rotation (1->2->3, GC > 3) — preserved from the previous arch
 # -----------------------------------------------------------------------------
 SNAP1="/data/uhl_overlay/snapshot.1"
 SNAP2="/data/uhl_overlay/snapshot.2"
@@ -101,7 +195,7 @@ else
 fi
 
 # -----------------------------------------------------------------------------
-# 3. OverlayFS assembly
+# 4. OverlayFS assembly
 # -----------------------------------------------------------------------------
 if ! mountpoint -q "$OVERLAY_MERGED"; then
     log "Assembling overlayfs"
@@ -114,7 +208,7 @@ fi
 mountpoint -q "$OVERLAY_MERGED" || fail 11 "overlay validation failed"
 
 # -----------------------------------------------------------------------------
-# 4. Bind Android namespaces into the merged tree
+# 5. Bind Android namespaces into the merged tree
 # -----------------------------------------------------------------------------
 bind() {
     src=$1; dst=$2; opts=${3:-}
@@ -147,7 +241,7 @@ bind /data/uhl_overlay /var/lib/ubuntu-gsi
 mount --rbind /halium "$OVERLAY_MERGED/halium" || true
 
 # -----------------------------------------------------------------------------
-# 5. Hand the GPU off
+# 6. Hand the GPU off
 # -----------------------------------------------------------------------------
 if [ -x /system/bin/ubuntu-gsi-stop-android-ui ]; then
     log "Stopping Android UI services for GPU hand-off"
@@ -155,7 +249,7 @@ if [ -x /system/bin/ubuntu-gsi-stop-android-ui ]; then
 fi
 
 # -----------------------------------------------------------------------------
-# 6. Sanity: systemd present?
+# 7. Sanity: systemd present?
 # -----------------------------------------------------------------------------
 SYSTEMD="/lib/systemd/systemd"
 if [ ! -x "$OVERLAY_MERGED$SYSTEMD" ]; then
@@ -163,7 +257,7 @@ if [ ! -x "$OVERLAY_MERGED$SYSTEMD" ]; then
 fi
 
 # -----------------------------------------------------------------------------
-# 7. Pivot.
+# 8. Pivot.
 #
 #    We use chroot rather than switch_root because Android init must keep
 #    its own root mount; tearing it down would kill HAL services we still

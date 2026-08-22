@@ -14,9 +14,11 @@ if [ -f "$CONFIG_FILE" ]; then
     source "$CONFIG_FILE"
 fi
 
-PHH_GSI_VERSION="${PHH_GSI_VERSION:-v412.r}"
-PHH_GSI_VARIANT="${PHH_GSI_VARIANT:-arm64-aonly-vanilla}"
-PHH_GSI_URL="${PHH_GSI_URL:-https://github.com/phhusson/treble_experimentations/releases/download/${PHH_GSI_VERSION}/system-${PHH_GSI_VARIANT}.img.xz}"
+PHH_GSI_VERSION="${PHH_GSI_VERSION:-v559}"
+PHH_GSI_VARIANT="${PHH_GSI_VARIANT:-arm64-ab-vanilla}"
+PHH_GSI_REPO="${PHH_GSI_REPO:-TrebleDroid/treble_experimentations}"
+PHH_GSI_URL="${PHH_GSI_URL:-https://github.com/${PHH_GSI_REPO}/releases/download/${PHH_GSI_VERSION}/system-${PHH_GSI_VARIANT}.img.xz}"
+PHH_GSI_SOURCE="${PHH_GSI_SOURCE:-release}"
 
 CACHE_DIR="$REPO_ROOT/builder/cache"
 PHH_IMG="$CACHE_DIR/phh-gsi.img"
@@ -73,6 +75,11 @@ if [ -f "$PHH_IMG" ]; then
     exit 0
 fi
 
+if [ "$PHH_GSI_SOURCE" = "custom" ]; then
+    info "PHH_GSI_SOURCE=custom: building from local treble_experimentations"
+    PHH_GSI_LOCAL="$(bash "$REPO_ROOT/scripts/build_custom_phh.sh" | tail -n 1)"
+fi
+
 if [ -n "${PHH_GSI_LOCAL:-}" ] && [ -f "$PHH_GSI_LOCAL" ]; then
     info "Using locally provided PHH GSI: $PHH_GSI_LOCAL"
     cp -f "$PHH_GSI_LOCAL" "$PHH_IMG"
@@ -89,6 +96,11 @@ info "Downloading PHH GSI:"
 info "  version  : $PHH_GSI_VERSION"
 info "  variant  : $PHH_GSI_VARIANT"
 info "  url      : $PHH_GSI_URL"
+
+if [[ "$PHH_GSI_VARIANT" != *"arm64-ab"* && "$PHH_GSI_VARIANT" != td-arm64-* ]]; then
+    error "Only arm64 A/B style variants are supported. Current: $PHH_GSI_VARIANT"
+    exit 1
+fi
 
 if ! download_file "$PHH_GSI_URL" "$PHH_DOWNLOAD"; then
     warn "PHH download failed (URL may be stale or rate-limited)."

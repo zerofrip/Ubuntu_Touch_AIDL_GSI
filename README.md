@@ -131,10 +131,40 @@ Engine supports mode-aware execution (`android`, `linux`, `both`) for per-action
 
 `config.env` defaults:
 
+- `PHH_GSI_SOURCE=release`
+- `PHH_GSI_REPO=TrebleDroid/treble_experimentations`
 - `PHH_GSI_VERSION=v559`
 - `PHH_GSI_VARIANT=arm64-ab-vanilla`
 
+Only `arm64 A/B` (dynamic partition) PHH variants are supported.
+
 Override in `config.env` or via environment variables if your target requires a different base.
+
+Local source build mode:
+
+- Set `PHH_GSI_SOURCE=custom`
+- Set `TREBLE_EXP_PATH` to your local `treble_experimentations` checkout
+- Optionally set `PHH_CUSTOM_TARGET` and `PHH_CUSTOM_VARIANT`
+- Run `make phh-custom` (or `make build`)
+
+Smaller preset shortcut:
+
+- `make phh-custom-minimal`
+- Equivalent to `PHH_CUSTOM_TARGET=android-15.0` + `PHH_CUSTOM_VARIANT=td-arm64-ab-vanilla`
+
+Ultra-light rootfs preset:
+
+- `make build-minimal`
+- Uses `GSI_ROOTFS_PROFILE=minimal` and `rootfs/packages.minimal.list`
+- Also applies aggressive rootfs pruning by default in minimal mode
+
+Rootfs persistence/self-heal:
+
+- Launcher keeps runtime rootfs in `/data/ubuntu-gsi/rootfs.erofs`
+- Backup copy is kept at `/data/ubuntu-gsi/rootfs.erofs.bak`
+- SHA-256 is verified at boot; missing/corrupt data copy is auto-restored
+- Restore source is system seed `/system/usr/share/ubuntu-gsi/rootfs.erofs`
+- `ROOTFS_SEED_IN_SYSTEM=0` keeps `system.img` smaller, but removes reset-time seed restore
 
 
 Quick reference flash guide: `docs/flash_quickstart.md`

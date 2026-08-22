@@ -4,7 +4,7 @@
 
 .DEFAULT_GOAL := help
 
-.PHONY: help all build phh rootfs erofs vbmeta system flash flash-system flash-vbmeta \
+.PHONY: help all build build-minimal build-android8-16 phh phh-custom phh-custom-minimal rootfs rootfs-minimal erofs vbmeta system userdata flash flash-system flash-vbmeta \
         check check-device clean lint deepclean gui-install
 
 help: ## Show available targets
@@ -20,11 +20,26 @@ all: build ## Build everything
 build: ## Full pipeline: phh -> rootfs -> erofs -> vbmeta -> system
 	@bash build.sh
 
+build-minimal: ## Full pipeline with minimal rootfs profile
+	@GSI_ROOTFS_PROFILE=minimal bash build.sh
+
+build-android8-16: ## Run Android 8-16 AIDL matrix build script
+	@bash scripts/build_android8_to16_aidl.sh
+
 phh: ## Fetch the PHH Treble GSI base
 	@bash scripts/fetch_phh_gsi.sh
 
+phh-custom: ## Build PHH from local source tree and cache it
+	@PHH_GSI_SOURCE=custom bash scripts/fetch_phh_gsi.sh
+
+phh-custom-minimal: ## Build smaller PHH preset (td arm64-ab vanilla)
+	@PHH_GSI_SOURCE=custom PHH_CUSTOM_TARGET=android-15.0 PHH_CUSTOM_VARIANT=td-arm64-ab-vanilla bash scripts/fetch_phh_gsi.sh
+
 rootfs: ## Build Ubuntu chroot rootfs (requires sudo)
 	@sudo bash scripts/build_rootfs.sh
+
+rootfs-minimal: ## Build minimal Ubuntu chroot rootfs (requires sudo)
+	@sudo GSI_ROOTFS_PROFILE=minimal bash scripts/build_rootfs.sh
 
 erofs: ## Pack chroot rootfs as erofs
 	@bash scripts/build_rootfs_erofs.sh
@@ -35,7 +50,10 @@ vbmeta: ## Generate vbmeta-disabled.img
 system: ## Compose system.img (requires sudo for loop-mount)
 	@sudo bash scripts/build_system_img.sh
 
-flash: ## Flash system + vbmeta-disabled
+userdata: ## Build userdata.img containing rootfs.erofs A/B seed
+	@bash scripts/build_userdata_img.sh
+
+flash: ## Flash system + vbmeta-disabled + userdata (with size checks)
 	@bash scripts/flash.sh
 
 flash-system: ## Flash system only
@@ -66,7 +84,9 @@ clean: ## Remove build artifacts (keep PHH cache)
 	rm -f builder/out/system.img
 	rm -f builder/out/linux_rootfs.erofs
 	rm -f builder/out/vbmeta-disabled.img
+	rm -f builder/out/userdata.img
 	rm -rf builder/out/system_staging
+	rm -rf builder/out/userdata_staging
 	rm -rf builder/out/ubuntu-rootfs
 	@echo "Done."
 
