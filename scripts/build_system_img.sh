@@ -213,6 +213,13 @@ done < <(find "$SYS_ROOT/usr/lib/ubuntu-gsi" "$SYS_ROOT/usr/share/ubuntu-gsi" -t
 
 success "Halium scaffolding overlaid"
 
+
+# Shrink PHH consumer apps / media for Halium (disable with GSI_SYSTEM_PRUNE=0).
+if [ -f "$REPO_ROOT/scripts/prune_phh_system.sh" ]; then
+    bash "$REPO_ROOT/scripts/prune_phh_system.sh" "$STAGING"
+fi
+
+
 # ---------------------------------------------------------------------------
 # Stage 3: pack ext4 (minimal size)
 # ---------------------------------------------------------------------------
