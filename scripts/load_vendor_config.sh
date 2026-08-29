@@ -17,8 +17,9 @@ _load_vendor_config() {
     local env_file=""
 
     if [ -z "$version" ]; then
-        if git -C "$_REPO_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-            branch="$(git -C "$_REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+        # sudo often hits "dubious ownership"; allow this repo for branch detect only
+        if git -C "$_REPO_ROOT" -c safe.directory="$_REPO_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            branch="$(git -C "$_REPO_ROOT" -c safe.directory="$_REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
             case "$branch" in
                 android-[0-9]*.[0-9]*)
                     version="$branch"
@@ -51,3 +52,4 @@ _load_vendor_config() {
 }
 
 _load_vendor_config
+
