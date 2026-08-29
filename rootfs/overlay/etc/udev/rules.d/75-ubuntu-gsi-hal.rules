@@ -1,0 +1,27 @@
+# Ubuntu GSI — non-GPU HAL device permissions (Phase 1)
+
+# ALSA
+SUBSYSTEM=="sound", KERNEL=="controlC*", MODE="0666", GROUP="audio"
+SUBSYSTEM=="sound", KERNEL=="pcm*", MODE="0666", GROUP="audio"
+SUBSYSTEM=="sound", KERNEL=="timer", MODE="0666", GROUP="audio"
+KERNEL=="snd*", MODE="0666", GROUP="audio"
+
+# Bluetooth UART / STP (MediaTek)
+KERNEL=="ttyBT*", MODE="0666", GROUP="dialout"
+KERNEL=="stpbt*", MODE="0666", GROUP="dialout"
+
+# GNSS
+KERNEL=="gps*", MODE="0666", GROUP="dialout"
+KERNEL=="gnss*", MODE="0666", GROUP="dialout"
+KERNEL=="stpgps*", MODE="0666", GROUP="dialout"
+
+# Modem / CCCI
+KERNEL=="ccci*", MODE="0666", GROUP="dialout"
+KERNEL=="ttyC*", MODE="0666", GROUP="dialout"
+
+# Backlight write for brightness daemons
+SUBSYSTEM=="backlight", KERNEL=="*", RUN+="/bin/chmod a+w /sys/class/backlight/%k/brightness"
+
+# Vibrator
+SUBSYSTEM=="leds", KERNEL=="*vibrator*", MODE="0666"
+SUBSYSTEM=="timed_output", MODE="0666"
