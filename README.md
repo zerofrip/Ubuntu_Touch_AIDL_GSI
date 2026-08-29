@@ -101,7 +101,10 @@ Release artifacts under `builder/out/`:
 
 - `android-12.0_system.img` … `android-16.0_system.img` (PHH/TrebleDroid base differs per version)
 - `userdata.img` and `vbmeta-disabled.img` once each (shared; not vendor-specific)
-- Optional release tag input attaches those assets to a GitHub Release
+- Optional release tag input attaches those assets to a GitHub Release as
+  `android-XX_system.img.xz` (xz-compressed; decompress before flash) plus
+  shared `userdata.img` / `vbmeta-disabled.img`. Raw uncompressed system images
+  remain on the workflow artifacts tab.
 
 For a single-version local/CI build, checkout the matching `android-*` branch instead.
 
@@ -112,7 +115,7 @@ For a single-version local/CI build, checkout the matching `android-*` branch in
 make flash
 ```
 
-or manually:
+or manually (local `builder/out/` images):
 
 ```bash
 fastboot flash vbmeta_a builder/out/vbmeta-disabled.img
@@ -122,6 +125,13 @@ fastboot reboot fastboot
 fastboot flash system_a builder/out/android-16.0_system.img
 fastboot flash userdata builder/out/userdata.img
 fastboot reboot
+```
+
+GitHub Release assets ship `android-XX_system.img.xz` — decompress first:
+
+```bash
+xz -dk android-16.0_system.img.xz
+fastboot flash system_a android-16.0_system.img
 ```
 
 Do **not** pass `--disable-verity` / `--disable-verification` to fastboot when flashing
@@ -221,7 +231,8 @@ Rootfs persistence/self-heal:
 
 From the Actions tab, run **Build Ubuntu GSI** on branch `main` (`workflow_dispatch`).
 That produces every `android-XX_system.img` plus one shared `userdata.img` and
-`vbmeta-disabled.img`. Set the optional tag input to publish a GitHub Release.
+`vbmeta-disabled.img`. Set the optional tag input to publish a GitHub Release
+(`*.img.xz` for system images so all majors fit under the 2GB asset limit).
 
 ## Documentation
 
@@ -235,4 +246,5 @@ That produces every `android-XX_system.img` plus one shared `userdata.img` and
 
 - Legacy docs/scripts that mention `linux_rootfs.squashfs`, squashfs **userdata pivot**, or binder bridge daemons are historical. Current `userdata.img` only seeds `/data/ubuntu-gsi/rootfs.erofs`.
 - See `docs/halium-architecture.md` for current behavior.
+
 
