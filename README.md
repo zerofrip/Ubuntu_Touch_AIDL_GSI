@@ -18,7 +18,7 @@ Build and release images from **vendor-version branches** (`android-12.0` … `a
 | `android-15.0` | 15 | `ci-20250415` | `td-arm64-ab-vanilla` |
 | `android-16.0` | 16 | `ci-20250617` | `td-arm64-vanilla` |
 
-For **HEADWOLF F8** (Android 16 / MT6897), use the **`android-16.0`** branch.
+For **HEADWOLF F8** (MT6897), try **`android-15.0`** first if the device was upgraded from Android 15→16 and Android 16 GSI bootloops. Use **`android-16.0`** when vendor/GSI major versions match cleanly.
 
 TrebleDroid references: [treble_experimentations releases](https://github.com/TrebleDroid/treble_experimentations/releases), [device_phh_treble](https://github.com/TrebleDroid/device_phh_treble).
 
@@ -51,14 +51,18 @@ Authoritative design doc: `docs/halium-architecture.md`
   - `bin/ubuntu-gsi-launcher` chroot pivot driver
   - `bin/ubuntu-gsi-stop-android-ui` SurfaceFlinger hand-off helper
   - `compat/` PHH/TrebleDroid-style compatibility engine
-  - `lomiri/start-lomiri.sh` Lomiri/libhybris startup scaffold
+  - `lomiri/start-lomiri.sh` Lomiri startup (indicators, secrets, app-net watchdog)
 - `scripts/`
   - `fetch_phh_gsi.sh` PHH base download/prepare
   - `build_rootfs.sh` Ubuntu chroot rootfs build
   - `build_rootfs_erofs.sh` rootfs -> erofs pack
   - `build_vbmeta_disabled.sh` disabled vbmeta build
   - `build_system_img.sh` PHH base + Halium overlay merge
-  - `flash.sh` flashes `system + vbmeta` only
+  - `build_userdata_img.sh` userdata seed (`/data/ubuntu-gsi/rootfs.erofs`)
+  - `flash.sh` flashes `system + vbmeta + userdata` (selective flags available)
+- `rootfs/overlay/usr/lib/ubuntu-gsi/`
+  - WiFi reclaim / app DNS+routing (`wifi-bringup.sh`, `halium-app-net.sh`)
+  - HAL / display bring-up helpers
 - `deprecated/`
   - legacy pre-Halium components kept for reference
 
@@ -66,7 +70,7 @@ Authoritative design doc: `docs/halium-architecture.md`
 
 ```bash
 sudo apt install \
-  debootstrap qemu-user-static e2fsprogs erofs-utils jq wget unzip \
+  debootstrap qemu-user-static e2fsprogs erofs-utils f2fs-tools jq wget unzip \
   android-sdk-libsparse-utils android-tools-fastboot python3
 ```
 
@@ -104,18 +108,30 @@ make flash
 or manually:
 
 ```bash
-fastboot --disable-verity --disable-verification flash vbmeta builder/out/vbmeta-disabled.img
-fastboot flash system builder/out/android-16.0_system.img
+fastboot flash vbmeta_a builder/out/vbmeta-disabled.img
+fastboot flash vbmeta_system_a builder/out/vbmeta-disabled.img
+fastboot flash vbmeta_vendor_a builder/out/vbmeta-disabled.img
+fastboot reboot fastboot
+fastboot flash system_a builder/out/android-16.0_system.img
 fastboot flash userdata builder/out/userdata.img
 fastboot reboot
 ```
 
-Selective flash:
+Do **not** pass `--disable-verity` / `--disable-verification` to fastboot when flashing
+standalone `vbmeta*.img` files. On fastboot 34+, that flag path fails with
+`Failed to find AVB_MAGIC at offset: 0`. Verity is disabled by baking `flags=3`
+into `vbmeta-disabled.img` at build time.
+
+`make flash` includes **userdata** (wipes `/data`). Use that on first install.
+For everyday system updates that keep existing `/data/ubuntu-gsi`, skip userdata:
 
 ```bash
 make flash-system
 make flash-vbmeta
+bash scripts/flash.sh --no-userdata
 ```
+
+Full flash guide: `docs/flash_quickstart.md`.
 
 ## Runtime Control
 
@@ -191,9 +207,16 @@ Rootfs persistence/self-heal:
 - `ROOTFS_SEED_IN_SYSTEM=0` keeps `system.img` smaller, but removes reset-time seed restore
 
 
-Quick reference flash guide: `docs/flash_quickstart.md`
+## Documentation
+
+- `docs/halium-architecture.md` — authoritative Halium design
+- `docs/flash_quickstart.md` — flash / userdata policy
+- `docs/boot_flow.md` / `docs/system_layout.md` — boot and layout
+- `docs/hal-bridge-matrix.md` — HAL bring-up matrix
+- `docs/lower-layer-display.md` — lower-layer / DRM display mode
 
 ## Notes
 
-- Legacy docs/scripts that mention `linux_rootfs.squashfs`, `userdata.img` pivot, or binder bridge daemons are historical and replaced by the Halium-style flow.
+- Legacy docs/scripts that mention `linux_rootfs.squashfs`, squashfs **userdata pivot**, or binder bridge daemons are historical. Current `userdata.img` only seeds `/data/ubuntu-gsi/rootfs.erofs`.
 - See `docs/halium-architecture.md` for current behavior.
+

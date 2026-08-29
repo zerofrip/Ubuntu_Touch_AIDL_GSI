@@ -14,7 +14,8 @@ Bootloader
   -> Android userspace + vendor HAL services
   -> /system/etc/init/ubuntu-gsi.rc
   -> /system/bin/ubuntu-gsi-launcher
-  -> mount rootfs.erofs + overlay on /data/uhl_overlay
+  -> mount /data/ubuntu-gsi/rootfs.erofs (+ heal from system seed if needed)
+  -> overlay on /data/uhl_overlay
   -> chroot to Ubuntu systemd
   -> Lomiri + Ubuntu services
 ```
@@ -22,9 +23,19 @@ Bootloader
 ## Key points
 
 - No custom PID1 replacement.
-- No `userdata.img` rootfs payload.
+- No legacy squashfs **rootfs pivot** on userdata. Current `userdata.img` only
+  **seeds** `/data/ubuntu-gsi/rootfs.erofs` and overlay directories for first boot.
+- Dual seed: runtime image on `/data`; optional heal from
+  `/system/usr/share/ubuntu-gsi/rootfs.erofs` (`ROOTFS_SEED_IN_SYSTEM`).
 - No mandatory binder bridge daemon in the primary boot path.
 - Compatibility quirks are applied by `halium/compat/compat-engine.sh` in Android and Linux modes.
+
+## Related docs
+
+- `docs/halium-architecture.md` — authoritative design
+- `docs/flash_quickstart.md` — flash / userdata policy
+- `docs/hal-bridge-matrix.md` — HAL bring-up matrix
+- `docs/lower-layer-display.md` — lower-layer display mode
 
 ## Legacy note
 
