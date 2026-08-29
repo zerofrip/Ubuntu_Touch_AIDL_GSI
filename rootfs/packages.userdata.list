@@ -1,0 +1,19 @@
+# =============================================================================
+# User-added packages for the userdata partition
+# =============================================================================
+# Edit this file to add extra apps without rebuilding system.img.
+#
+# Format (one per line):
+#   click:<openstore-id>     e.g. click:com.ubuntu.terminal
+#   deb:<package-name>       e.g. deb:htop  (staged only; install via provision)
+#
+# Provision after flash (does NOT wipe userdata):
+#   bash scripts/provision_userdata_packages.sh
+#
+# Also staged into userdata.img by scripts/build_userdata_img.sh under:
+#   /data/ubuntu-gsi/user-packages/{clicks,debs}/
+# =============================================================================
+
+# Examples (commented):
+# click:com.ubuntu.terminal
+# click:gallery.ubports

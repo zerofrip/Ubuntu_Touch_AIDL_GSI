@@ -24,7 +24,6 @@ VBMETA_IMG="$OUT_DIR/vbmeta-disabled.img"
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'
-BOLD='\033[1m'
 NC='\033[0m'
 
 info()    { echo -e "${CYAN}[Release]${NC}  $1"; }
@@ -52,3 +51,6 @@ ln -sfn "$RELEASE_SYSTEM_IMG" "$OUT_DIR/system.img"
 success "System image: $RELEASE_SYSTEM_PATH ($(du -h "$RELEASE_SYSTEM_PATH" | cut -f1))"
 success "Userdata image: $USERDATA_IMG ($(du -h "$USERDATA_IMG" | cut -f1))"
 success "Vbmeta image: $VBMETA_IMG ($(du -h "$VBMETA_IMG" | cut -f1))"
+
+bash "$REPO_ROOT/scripts/verify_system_img.sh" "$RELEASE_SYSTEM_PATH"
+
