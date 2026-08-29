@@ -18,7 +18,7 @@ Build and release images from **vendor-version branches** (`android-12.0` … `a
 | `android-15.0` | 15 | `ci-20250415` | `td-arm64-ab-vanilla` |
 | `android-16.0` | 16 | `ci-20250617` | `td-arm64-vanilla` |
 
-For **HEADWOLF F8** (Android 16 / MT6897), use the **`android-16.0`** branch.
+For **HEADWOLF F8** (MT6897), try **`android-15.0`** first if the device was upgraded from Android 15→16 and Android 16 GSI bootloops. Use **`android-16.0`** when vendor/GSI major versions match cleanly.
 
 TrebleDroid references: [treble_experimentations releases](https://github.com/TrebleDroid/treble_experimentations/releases), [device_phh_treble](https://github.com/TrebleDroid/device_phh_treble).
 
@@ -104,11 +104,19 @@ make flash
 or manually:
 
 ```bash
-fastboot --disable-verity --disable-verification flash vbmeta builder/out/vbmeta-disabled.img
-fastboot flash system builder/out/android-16.0_system.img
+fastboot flash vbmeta_a builder/out/vbmeta-disabled.img
+fastboot flash vbmeta_system_a builder/out/vbmeta-disabled.img
+fastboot flash vbmeta_vendor_a builder/out/vbmeta-disabled.img
+fastboot reboot fastboot
+fastboot flash system_a builder/out/android-16.0_system.img
 fastboot flash userdata builder/out/userdata.img
 fastboot reboot
 ```
+
+Do **not** pass `--disable-verity` / `--disable-verification` to fastboot when flashing
+standalone `vbmeta*.img` files. On fastboot 34+, that flag path fails with
+`Failed to find AVB_MAGIC at offset: 0`. Verity is disabled by baking `flags=3`
+into `vbmeta-disabled.img` at build time.
 
 Selective flash:
 
@@ -197,3 +205,4 @@ Quick reference flash guide: `docs/flash_quickstart.md`
 
 - Legacy docs/scripts that mention `linux_rootfs.squashfs`, `userdata.img` pivot, or binder bridge daemons are historical and replaced by the Halium-style flow.
 - See `docs/halium-architecture.md` for current behavior.
+
