@@ -59,6 +59,7 @@ Authoritative design doc: `docs/halium-architecture.md`
   - `build_vbmeta_disabled.sh` disabled vbmeta build
   - `build_system_img.sh` PHH base + Halium overlay merge
   - `build_userdata_img.sh` userdata seed (`/data/ubuntu-gsi/rootfs.erofs`)
+  - `fetch_openstore_clicks.sh` Core Apps click download (`rootfs/clicks.core-apps.list`)
   - `flash.sh` flashes `system + vbmeta + userdata` (selective flags available)
 - `rootfs/overlay/usr/lib/ubuntu-gsi/`
   - WiFi reclaim / app DNS+routing (`wifi-bringup.sh`, `halium-app-net.sh`)
@@ -214,6 +215,13 @@ Ultra-light rootfs preset:
 - `make build-minimal`
 - Uses `GSI_ROOTFS_PROFILE=minimal` and `rootfs/packages.minimal.list`
 - Also applies aggressive rootfs pruning by default in minimal mode
+
+Core Apps (OpenStore clicks):
+
+- Listed in `rootfs/clicks.core-apps.list`
+- Fetched during `build_rootfs` into `builder/cache/openstore-clicks/` (or `make fetch-clicks`)
+- Unpacked into rootfs at `/opt/click.ubuntu.com/` with `.desktop` entries for the Lomiri app drawer
+- Skip network fetch with `GSI_SKIP_CLICK_FETCH=1` (uses existing cache only)
 
 Rootfs persistence/self-heal:
 

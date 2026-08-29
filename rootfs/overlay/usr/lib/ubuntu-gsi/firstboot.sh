@@ -1138,6 +1138,81 @@ else
     log "WARN: openstore-client not found — click apps unavailable"
 fi
 
+
+# ---------------------------------------------------------------------------
+# 4q2. Preinstalled + user Click packages
+# ---------------------------------------------------------------------------
+CLICK_MARKER="/data/uhl_overlay/.core_clicks_installed"
+if [ ! -f "$CLICK_MARKER" ]; then
+    log "Installing preinstalled / user Click packages"
+    install_click() {
+        local c="$1"
+        [ -f "$c" ] || return 0
+        log "  click: $c"
+        export PATH="/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
+        if command -v pkcon >/dev/null 2>&1; then
+            pkcon install-local --allow-untrusted "$c" >>"$LOG" 2>&1 || true
+        elif command -v click >/dev/null 2>&1; then
+            click install --force-missing-framework --allow-unauthenticated --user=ubuntu "$c" >>"$LOG" 2>&1 \
+                || click install --force-missing-framework --allow-unauthenticated --all-users "$c" >>"$LOG" 2>&1 || true
+        else
+            log "  WARN: pkcon/click not available for $c"
+        fi
+    }
+    for c in /usr/share/ubuntu-gsi/preinstalled-clicks/*.click; do
+        install_click "$c"
+    done
+    for c in /data/ubuntu-gsi/user-packages/clicks/*.click; do
+        install_click "$c"
+    done
+    date -Iseconds > "$CLICK_MARKER"
+    log "Click install pass complete → $CLICK_MARKER"
+else
+    log "Click install marker present — skipping ($CLICK_MARKER)"
+fi
+
+# ---------------------------------------------------------------------------
+# 4q3. Core Apps drawer shortcuts (user applications)
+# ---------------------------------------------------------------------------
+DRAWER_MARKER="/data/uhl_overlay/.core_click_desktops_seeded"
+if [ ! -f "$DRAWER_MARKER" ] && id -u ubuntu >/dev/null 2>&1; then
+    log "Seeding Core Apps shortcuts into ubuntu applications drawer"
+    USER_APPS="/home/ubuntu/.local/share/applications"
+    mkdir -p "$USER_APPS"
+    seeded=0
+    MANIFEST="/usr/share/ubuntu-gsi/preinstalled-click-desktops.list"
+    if [ -f "$MANIFEST" ]; then
+        while IFS= read -r base || [ -n "$base" ]; do
+            base="$(echo "$base" | tr -d '[:space:]')"
+            [ -z "$base" ] && continue
+            src="/usr/share/applications/$base"
+            if [ -f "$src" ]; then
+                cp -a "$src" "$USER_APPS/$base"
+                seeded=$((seeded + 1))
+            fi
+        done < "$MANIFEST"
+    else
+        for src in /usr/share/applications/*.desktop; do
+            [ -f "$src" ] || continue
+            if grep -q '/opt/click.ubuntu.com/' "$src" 2>/dev/null; then
+                cp -a "$src" "$USER_APPS/$(basename "$src")"
+                seeded=$((seeded + 1))
+            fi
+        done
+    fi
+    if [ -f /usr/share/applications/openstore-client.desktop ]; then
+        cp -a /usr/share/applications/openstore-client.desktop \
+            "$USER_APPS/openstore-client.desktop"
+        seeded=$((seeded + 1))
+    fi
+    chown -R ubuntu:ubuntu "$USER_APPS" 2>/dev/null || true
+    date -Iseconds > "$DRAWER_MARKER"
+    log "Seeded $seeded drawer shortcut(s) → $USER_APPS"
+elif [ -f "$DRAWER_MARKER" ]; then
+    log "Drawer shortcut marker present — skipping ($DRAWER_MARKER)"
+fi
+
+
 # Enable SSH
 if [ -f /etc/ssh/sshd_config ]; then
     systemctl enable ssh 2>/dev/null || true

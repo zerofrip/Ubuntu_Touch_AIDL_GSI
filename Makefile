@@ -4,7 +4,7 @@
 
 .DEFAULT_GOAL := help
 
-.PHONY: help all build build-minimal build-android8-16 phh phh-custom phh-custom-minimal rootfs rootfs-minimal erofs vbmeta system userdata release flash flash-system flash-vbmeta \
+.PHONY: help all build build-minimal build-android8-16 phh phh-custom phh-custom-minimal fetch-clicks rootfs rootfs-minimal erofs vbmeta system userdata release flash flash-system flash-vbmeta \
         check check-device clean lint deepclean gui-install
 
 help: ## Show available targets
@@ -34,6 +34,9 @@ phh-custom: ## Build PHH from local source tree and cache it
 
 phh-custom-minimal: ## Build smaller PHH preset (td arm64-ab vanilla)
 	@PHH_GSI_SOURCE=custom PHH_CUSTOM_TARGET=android-15.0 PHH_CUSTOM_VARIANT=td-arm64-ab-vanilla bash scripts/fetch_phh_gsi.sh
+
+fetch-clicks: ## Download Core Apps clicks (rootfs/clicks.core-apps.list)
+	@bash scripts/fetch_openstore_clicks.sh
 
 rootfs: ## Build Ubuntu chroot rootfs (requires sudo)
 	@sudo bash scripts/build_rootfs.sh
