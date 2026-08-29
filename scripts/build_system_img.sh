@@ -30,11 +30,11 @@ fi
 
 CACHE_DIR="$REPO_ROOT/builder/cache"
 PHH_IMG="$CACHE_DIR/phh-gsi.img"
-EROFS_IMG="$REPO_ROOT/builder/out/linux_rootfs.erofs"
+EROFS_IMG="${EROFS_IMG:-$REPO_ROOT/builder/out/linux_rootfs.erofs}"
 HALIUM_DIR="$REPO_ROOT/halium"
 
 OUT_DIR="$REPO_ROOT/builder/out"
-OUT_IMG="$OUT_DIR/system.img"
+OUT_IMG="${SYSTEM_OUT:-$OUT_DIR/system.img}"
 STAGING="$OUT_DIR/system_staging"
 PHH_MNT="$OUT_DIR/.phh-mount"
 
@@ -110,14 +110,14 @@ cp -a "$PHH_MNT/." "$STAGING/"
 umount "$PHH_MNT"
 rmdir "$PHH_MNT"
 
-# Some PHH GSIs are mounted at /system/ inside the loop; others put files at
-# the root. Detect and normalise.
+# Some PHH GSIs are a full Android rootfs (nested /system + /init). F8 boots
+# that layout (H100). Do NOT flatten — Halium files go under /system/...
 if [ -d "$STAGING/system" ] && [ -f "$STAGING/system/build.prop" ]; then
-    info "PHH base uses /system subtree — flattening"
-    mv "$STAGING/system" "$STAGING/.flat"
-    rm -rf "${STAGING:?}"/* 2>/dev/null || true
-    mv "$STAGING/.flat"/* "$STAGING/"
-    rmdir "$STAGING/.flat"
+    info "PHH base uses nested /system rootfs — keeping layout (no flatten)"
+    SYS_ROOT="$STAGING/system"
+else
+    info "PHH base is already flat system partition layout"
+    SYS_ROOT="$STAGING"
 fi
 
 success "PHH base extracted ($(du -sh "$STAGING" | cut -f1))"
@@ -125,29 +125,57 @@ success "PHH base extracted ($(du -sh "$STAGING" | cut -f1))"
 # ---------------------------------------------------------------------------
 # Stage 2: overlay halium additions
 # ---------------------------------------------------------------------------
-info "Overlaying Halium scaffolding"
+info "Overlaying Halium scaffolding into $SYS_ROOT"
 
 # init.rc
-mkdir -p "$STAGING/etc/init"
-install -m 0644 "$HALIUM_DIR/etc/init/ubuntu-gsi.rc" "$STAGING/etc/init/ubuntu-gsi.rc"
+mkdir -p "$SYS_ROOT/etc/init"
+install -m 0644 "$HALIUM_DIR/etc/init/ubuntu-gsi.rc" "$SYS_ROOT/etc/init/ubuntu-gsi.rc"
+
+# Default: Lomiri auto-starts after Android boot_completed (opt out: enable=0).
+_prop_files=(
+    "$SYS_ROOT/build.prop"
+    "$SYS_ROOT/etc/prop.default"
+    "$SYS_ROOT/etc/build.prop"
+)
+_baked=0
+for _pf in "${_prop_files[@]}"; do
+    if [ -f "$_pf" ]; then
+        if ! grep -q '^persist\.ubuntu_gsi\.enable=' "$_pf" 2>/dev/null; then
+            printf '\n# Ubuntu GSI: auto-start Lomiri on power-on (set 0 for Android-only)\npersist.ubuntu_gsi.enable=1\n' >> "$_pf"
+            info "Baked persist.ubuntu_gsi.enable=1 into ${_pf#"$SYS_ROOT"/}"
+        else
+            # Force default ON in the image; device persist can still override at runtime.
+            sed -i 's/^persist\.ubuntu_gsi\.enable=.*/persist.ubuntu_gsi.enable=1/' "$_pf"
+            info "Updated persist.ubuntu_gsi.enable=1 in ${_pf#"$SYS_ROOT"/}"
+        fi
+        _baked=1
+        break
+    fi
+done
+if [ "$_baked" -eq 0 ]; then
+    mkdir -p "$SYS_ROOT/etc"
+    printf '# Ubuntu GSI: auto-start Lomiri on power-on\npersist.ubuntu_gsi.enable=1\n' > "$SYS_ROOT/etc/prop.default"
+    info "Created $SYS_ROOT/etc/prop.default with persist.ubuntu_gsi.enable=1"
+fi
+
 
 # Launcher binaries
-mkdir -p "$STAGING/bin"
-install -m 0755 "$HALIUM_DIR/bin/ubuntu-gsi-launcher"        "$STAGING/bin/ubuntu-gsi-launcher"
-install -m 0755 "$HALIUM_DIR/bin/ubuntu-gsi-stop-android-ui" "$STAGING/bin/ubuntu-gsi-stop-android-ui"
+mkdir -p "$SYS_ROOT/bin"
+install -m 0755 "$HALIUM_DIR/bin/ubuntu-gsi-launcher"        "$SYS_ROOT/bin/ubuntu-gsi-launcher"
+install -m 0755 "$HALIUM_DIR/bin/ubuntu-gsi-stop-android-ui" "$SYS_ROOT/bin/ubuntu-gsi-stop-android-ui"
 
 # Compat layer (mirrored to /system/usr/lib/ubuntu-gsi/compat)
-mkdir -p "$STAGING/usr/lib/ubuntu-gsi/compat"
-cp -a "$HALIUM_DIR/compat/." "$STAGING/usr/lib/ubuntu-gsi/compat/"
-find "$STAGING/usr/lib/ubuntu-gsi/compat" -type f -name '*.sh' -exec chmod 0755 {} \;
+mkdir -p "$SYS_ROOT/usr/lib/ubuntu-gsi/compat"
+cp -a "$HALIUM_DIR/compat/." "$SYS_ROOT/usr/lib/ubuntu-gsi/compat/"
+find "$SYS_ROOT/usr/lib/ubuntu-gsi/compat" -type f -name '*.sh' -exec chmod 0755 {} \;
 
 # Linux rootfs erofs seed for userdata self-heal (optional for size saving)
-mkdir -p "$STAGING/usr/share/ubuntu-gsi"
+mkdir -p "$SYS_ROOT/usr/share/ubuntu-gsi"
 if [ "$ROOTFS_SEED_IN_SYSTEM" = "1" ]; then
-    cp -a "$EROFS_IMG" "$STAGING/usr/share/ubuntu-gsi/rootfs.erofs"
+    cp -a "$EROFS_IMG" "$SYS_ROOT/usr/share/ubuntu-gsi/rootfs.erofs"
     if command -v sha256sum >/dev/null 2>&1; then
         (
-            cd "$STAGING/usr/share/ubuntu-gsi"
+            cd "$SYS_ROOT/usr/share/ubuntu-gsi"
             sha256sum rootfs.erofs > rootfs.erofs.sha256
         )
     fi
@@ -157,13 +185,40 @@ else
 fi
 
 # Lomiri launch helper (also linked from the Linux rootfs)
-mkdir -p "$STAGING/usr/share/ubuntu-gsi/halium-lomiri"
+mkdir -p "$SYS_ROOT/usr/share/ubuntu-gsi/halium-lomiri"
 install -m 0755 "$HALIUM_DIR/lomiri/start-lomiri.sh" \
-    "$STAGING/usr/share/ubuntu-gsi/halium-lomiri/start-lomiri.sh"
+    "$SYS_ROOT/usr/share/ubuntu-gsi/halium-lomiri/start-lomiri.sh"
 install -m 0644 "$HALIUM_DIR/lomiri/README.md" \
-    "$STAGING/usr/share/ubuntu-gsi/halium-lomiri/README.md"
+    "$SYS_ROOT/usr/share/ubuntu-gsi/halium-lomiri/README.md"
+
+
+# mkfs.ext4 -d does not infer SELinux labels; unlabeled binaries cannot be
+# executed by init (avc: denied { execute } tcontext=unlabeled permissive=0).
+label_system_file() {
+    local p="$1"
+    [ -e "$p" ] || return 0
+    if command -v setfattr >/dev/null 2>&1; then
+        setfattr -n security.selinux -v 'u:object_r:system_file:s0' "$p" || warn "setfattr failed: $p"
+    else
+        python3 -c "import os,sys; os.setxattr(sys.argv[1],'security.selinux',b'u:object_r:system_file:s0')" "$p" \
+            || warn "setxattr failed: $p"
+    fi
+}
+label_system_file "$SYS_ROOT/bin/ubuntu-gsi-launcher"
+label_system_file "$SYS_ROOT/bin/ubuntu-gsi-stop-android-ui"
+label_system_file "$SYS_ROOT/etc/init/ubuntu-gsi.rc"
+while IFS= read -r -d '' f; do
+    label_system_file "$f"
+done < <(find "$SYS_ROOT/usr/lib/ubuntu-gsi" "$SYS_ROOT/usr/share/ubuntu-gsi" -type f -print0 2>/dev/null || true)
 
 success "Halium scaffolding overlaid"
+
+
+# Shrink PHH consumer apps / media for Halium (disable with GSI_SYSTEM_PRUNE=0).
+if [ -f "$REPO_ROOT/scripts/prune_phh_system.sh" ]; then
+    bash "$REPO_ROOT/scripts/prune_phh_system.sh" "$STAGING"
+fi
+
 
 # ---------------------------------------------------------------------------
 # Stage 3: pack ext4 (minimal size)
@@ -217,8 +272,18 @@ rm -rf "$STAGING"
 
 OUT_HUMAN=$(du -h "$OUT_IMG" | cut -f1)
 success "system.img ready: $OUT_IMG ($OUT_HUMAN)"
+
+# Keep release-named artifact in sync (isolate/flash default to RELEASE_SYSTEM_IMG)
+if [ -n "${RELEASE_SYSTEM_IMG:-}" ] && [ "$RELEASE_SYSTEM_IMG" != "system.img" ]; then
+    RELEASE_PATH="$OUT_DIR/$RELEASE_SYSTEM_IMG"
+    cp -f "$OUT_IMG" "$RELEASE_PATH"
+    success "Also wrote $RELEASE_PATH"
+fi
+
 echo ""
 echo -e "  ${BOLD}Flash with:${NC}"
 echo -e "    fastboot flash system $OUT_IMG"
-echo -e "    fastboot --disable-verity --disable-verification flash vbmeta builder/out/vbmeta-disabled.img"
+echo -e "    fastboot flash vbmeta_a builder/out/vbmeta-disabled.img"
+echo -e "    fastboot flash vbmeta_system_a builder/out/vbmeta-disabled.img"
 echo -e "    fastboot reboot"
+

@@ -25,7 +25,7 @@ fi
 
 ROOTFS_DIR="${ROOTFS_DIR:-$REPO_ROOT/builder/out/ubuntu-rootfs}"
 OUT_DIR="$REPO_ROOT/builder/out"
-OUT_IMG="$OUT_DIR/linux_rootfs.erofs"
+OUT_IMG="${EROFS_OUT:-$OUT_DIR/linux_rootfs.erofs}"
 EROFS_COMP="${EROFS_COMP:-lz4hc,9}"
 
 mkdir -p "$OUT_DIR"
@@ -58,11 +58,25 @@ if [ ! -d "$ROOTFS_DIR" ] || [ -z "$(ls -A "$ROOTFS_DIR" 2>/dev/null)" ]; then
     exit 1
 fi
 
+# 0700 dirs (ssl/private, polkit, /root) are unreadable as a normal user.
+# mkfs.erofs then fails with permission denied (Error 13).
+if [ "$(id -u)" -ne 0 ]; then
+    info "Rootfs has root-only directories — re-running via sudo"
+    exec sudo -E bash "$0" "$@"
+fi
+
 # ---------------------------------------------------------------------------
 # Pack
 # ---------------------------------------------------------------------------
+if [ -e "$OUT_IMG" ] && [ ! -w "$OUT_IMG" ]; then
+    error "Cannot overwrite $OUT_IMG (owned by $(stat -c '%U:%G' "$OUT_IMG" 2>/dev/null || echo unknown))"
+    error "  Fix: sudo chown \"\$USER:\$USER\" \"$OUT_IMG\""
+    error "   or: sudo rm -f \"$OUT_IMG\""
+    exit 1
+fi
 rm -f "$OUT_IMG"
-ROOTFS_BYTES=$(du -sb "$ROOTFS_DIR" | cut -f1)
+ROOTFS_BYTES=$(du -sb "$ROOTFS_DIR" 2>/dev/null | cut -f1 || true)
+ROOTFS_BYTES="${ROOTFS_BYTES:-1}"
 ROOTFS_MB=$(( ROOTFS_BYTES / 1024 / 1024 ))
 
 info "Packing rootfs ($ROOTFS_MB MB → $OUT_IMG)"
@@ -70,8 +84,13 @@ info "  compression : $EROFS_COMP"
 
 mkfs.erofs -z "$EROFS_COMP" -d 2 -T 1740000000 "$OUT_IMG" "$ROOTFS_DIR"
 
+if [ -n "${SUDO_USER:-}" ]; then
+    chown "${SUDO_USER}:${SUDO_USER}" "$OUT_IMG" 2>/dev/null || true
+fi
+
 OUT_BYTES=$(du -sb "$OUT_IMG" | cut -f1)
 OUT_MB=$(( OUT_BYTES / 1024 / 1024 ))
 RATIO=$(( OUT_BYTES * 100 / ROOTFS_BYTES ))
 
 success "linux_rootfs.erofs built: $OUT_IMG ($OUT_MB MB, $RATIO% of source)"
+
