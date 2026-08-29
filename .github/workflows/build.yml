@@ -165,8 +165,11 @@ jobs:
 
             ### Flash instructions
             ```sh
-            fastboot --disable-verity --disable-verification flash vbmeta vbmeta-disabled.img
-            fastboot flash system ${{ steps.vendor.outputs.system_img }}
+            fastboot flash vbmeta_a vbmeta-disabled.img
+            fastboot flash vbmeta_system_a vbmeta-disabled.img
+            fastboot flash vbmeta_vendor_a vbmeta-disabled.img
+            fastboot reboot fastboot
+            fastboot flash system_a ${{ steps.vendor.outputs.system_img }}
             fastboot flash userdata userdata.img
             fastboot reboot
             ```
@@ -176,3 +179,4 @@ jobs:
           fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
