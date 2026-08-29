@@ -14,7 +14,7 @@ set -eu
 
 LOG_TAG="ubuntu-gsi-stop-android-ui"
 log() {
-    log -t "$LOG_TAG" "$*" 2>/dev/null || true
+    /system/bin/log -t "$LOG_TAG" "$*" 2>/dev/null || true
     echo "[$LOG_TAG] $*" 1>&2
 }
 
@@ -62,5 +62,15 @@ setprop ctl.stop zygote_secondary || true
 # (Best-effort; ignored if the device isn't using DRM.)
 chmod 0666 /dev/dri/* 2>/dev/null || true
 
+# Android HWC nodes — Mir/libhybris need these after SF stops.
+if [ -d /dev/graphics ]; then
+    chmod 0666 /dev/graphics/* 2>/dev/null || true
+    log "/dev/graphics permissions opened"
+fi
+
+sf_state=$(getprop init.svc.surfaceflinger 2>/dev/null || echo "unknown")
+log "surfaceflinger state after stop: ${sf_state}"
+
 log "android UI services stopped"
 exit 0
+

@@ -106,9 +106,15 @@ jq
 curl
 grim
 
-# GUI / Display
-mir-graphics-drivers-desktop
-mir-platform-graphics-wayland
+# GUI / Display — Android GPU via libhybris (not desktop Mesa-only stack)
+mir-graphics-drivers-android
+mir-graphics-drivers-android2
+mir-platform-graphics-android15
+mir-platform-graphics-android2-15
+mir-platform-input-evdev7
+libhybris
+libhybris-utils
+libhardware2
 libdrm2
 libdrm-common
 libgbm1
@@ -136,15 +142,17 @@ lomiri-settings-components
 lomiri-notifications
 lomiri-polkit-agent
 
-# UBports Core — Indicators
+# UBports Core — Indicators (+ Ayatana backends used by Lomiri panel)
+ayatana-indicator-common
+ayatana-indicator-datetime
+ayatana-indicator-display
+ayatana-indicator-keyboard
+ayatana-indicator-power
+ayatana-indicator-session
+ayatana-indicator-sound
 lomiri-indicator-network
-lomiri-indicator-datetime
-lomiri-indicator-session
-lomiri-indicator-power
-lomiri-indicator-sound
-lomiri-indicator-messages
-lomiri-indicator-location
-lomiri-indicator-transfer
+indicator-transfer
+indicator-transfer-common
 
 # UBports Core — System Settings panels
 lomiri-system-settings
@@ -205,6 +213,9 @@ gsettings-qt
 u1db-qt
 qqc2-suru-style
 qtmir
+qtwayland5
+libqt5waylandclient5
+libqt5waylandcompositor5
 platform-api
 xdg-desktop-portal-lomiri
 
@@ -215,28 +226,28 @@ ubuntu-touch-settings
 ubuntu-touch-meta
 
 # ---------------------------------------------------------------------------
-# UBports Apps — Core Applications (essential, pre-installed as deb)
-# https://gitlab.com/ubports/development/apps
+# UBports Apps — Core Applications (apt subset; see also packages.core-apps.list)
+# Full CORE_APPS.md mapping:
+#   apt  → rootfs/packages.core-apps.list (merged at build time)
+#   click → rootfs/clicks.core-apps.list (OpenStore; fetch_openstore_clicks.sh)
+#   user extras → rootfs/packages.userdata.list (userdata partition)
 # ---------------------------------------------------------------------------
 morph-browser
-lomiri-calculator-app
-lomiri-camera-app
-lomiri-clock-app
-lomiri-filemanager-app
-
-# UBports Core — Communication apps
-lomiri-dialer-app
-lomiri-messaging-app
-lomiri-addressbook-app
-
-# ---------------------------------------------------------------------------
-# OpenStore — Click package manager
-# Non-essential apps are installed from OpenStore at runtime:
-#   lomiri-calendar-app, lomiri-docviewer-app, lomiri-gallery-app,
-#   lomiri-music-app, lomiri-notes-app, lomiri-terminal-app,
-#   lomiri-weather-app, lomiri-mediaplayer-app, lomiri-printing-app
-# ---------------------------------------------------------------------------
-openstore-client
+# morph-browser Browser.qml imports QtQuick.Controls (not pulled as Depends)
+qml-module-qtquick-controls
+qml-module-qtquick-controls2
+qml-module-qtquick-templates2
+qml-module-qtquick-privatewidgets
+# Legacy click apps (Terminal) import Ubuntu.Components → Lomiri compat layer
+qml-module-ubuntu-components
+qml-module-lomiri-components-extras
+dialer-app
+messaging-app
+address-book-app
+mediaplayer-app
+# Morph Browser pulls Controls QML but not always the shared libs
+libqt5quickcontrols2-5
+libqt5quicktemplates2-5
 
 # Setup wizard & fonts
 zenity
@@ -247,3 +258,10 @@ nano
 less
 htop
 e2fsprogs
+
+# Terminal (OpenStore click: com.ubuntu.terminal — see clicks.core-apps.list)
+# X11 apps (xgps, …) need Xwayland under Mir/qtmir; use hybris build on Halium.
+xwayland-hybris
+
+
+
