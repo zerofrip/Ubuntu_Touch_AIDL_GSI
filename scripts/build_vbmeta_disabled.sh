@@ -75,8 +75,10 @@ import struct, sys
 out, padding, flags = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
 release = f'Ubuntu GSI vbmeta-disabled (flags={flags})\0'.encode()
 release = release + b'\0' * (48 - len(release))
+# AvbVBMetaImageHeader (libavb): ... rollback_index(Q), flags(I),
+# rollback_index_location(I), release_string[48], reserved[80] == 256 bytes.
 header = struct.pack(
-    '>4sLLQQLQQQQQQQQQQII48s',
+    '>4sLLQQLQQQQQQQQQQQII48s80s',
     b'AVB0', 1, 0,
     0, 0,
     0,
@@ -84,6 +86,7 @@ header = struct.pack(
     0,
     flags, 0,
     release,
+    b'\0' * 80,
 )
 assert len(header) == 256
 with open(out, 'wb') as f:
