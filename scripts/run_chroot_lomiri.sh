@@ -131,9 +131,11 @@ fi
 # Ubuntu.Components compat (Terminal click) + QtQuick.Templates.2 (Morph/Controls.2)
 QML_ROOT_CACHE="$REPO/builder/cache/qml-debs/extract/usr/lib/aarch64-linux-gnu/qt5/qml"
 if [ -f "$QML_ROOT_CACHE/Ubuntu/Components/qmldir" ] || [ -f "$QML_ROOT_CACHE/QtQuick/Templates.2/qmldir" ]; then
-    tar -C "$REPO/builder/cache/qml-debs/extract" -cf /tmp/qml-compat-push.tar \
-        $( [ -d "$QML_ROOT_CACHE/Ubuntu" ] && echo usr/lib/aarch64-linux-gnu/qt5/qml/Ubuntu ) \
-        $( [ -d "$QML_ROOT_CACHE/QtQuick/Templates.2" ] && echo usr/lib/aarch64-linux-gnu/qt5/qml/QtQuick/Templates.2 ) \
+    _qml_tar_args=""
+    [ -d "$QML_ROOT_CACHE/Ubuntu" ] && _qml_tar_args="$_qml_tar_args usr/lib/aarch64-linux-gnu/qt5/qml/Ubuntu"
+    [ -d "$QML_ROOT_CACHE/QtQuick/Templates.2" ] && _qml_tar_args="$_qml_tar_args usr/lib/aarch64-linux-gnu/qt5/qml/QtQuick/Templates.2"
+    # shellcheck disable=SC2086
+    tar -C "$REPO/builder/cache/qml-debs/extract" -cf /tmp/qml-compat-push.tar $_qml_tar_args \
         2>/dev/null || true
     if [ -s /tmp/qml-compat-push.tar ]; then
         adb push /tmp/qml-compat-push.tar /data/local/tmp/qml-compat.tar >/dev/null

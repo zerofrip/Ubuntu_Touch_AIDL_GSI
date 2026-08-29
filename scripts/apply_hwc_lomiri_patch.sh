@@ -10,5 +10,6 @@ mount --bind "$PATCHED" "$TARGET"
 stop surfaceflinger 2>/dev/null || true
 stop vendor.hwcomposer-3-2 2>/dev/null || true
 stop vender.mediatek.hardware.pq_aidl-default 2>/dev/null || true
+# shellcheck disable=SC2046
 kill -9 $(pidof surfaceflinger android.hardware.graphics.composer@3.2-service vendor.mediatek.hardware.pq_aidl-service lomiri) 2>/dev/null || true
 echo "HWC patch mounted: $PATCHED -> $TARGET"

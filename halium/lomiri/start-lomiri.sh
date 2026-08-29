@@ -86,8 +86,9 @@ apply_gpu_env() {
                     done
                 fi
                 if [ -n "$_gles" ]; then
-                    export LIBEGL=$(basename "$_gles")
-                    export LIBGLESV2=$(basename "$_gles")
+                    LIBEGL=$(basename "$_gles")
+                    LIBGLESV2=$(basename "$_gles")
+                    export LIBEGL LIBGLESV2
                 fi
             fi
             # Mir turns MIR_SERVER_FOO into --foo. GRAPHICS_PLATFORM is not a
@@ -294,7 +295,8 @@ for ui in /system_real/lib64/libui.so /system/lib64/libui.so; do
     break
   fi
 done
-export HYBRIS_LD_LIBRARY_PATH="${ALIAS_DIR}:$(build_hybris_ld_path)"
+HYBRIS_LD_LIBRARY_PATH="${ALIAS_DIR}:$(build_hybris_ld_path)"
+export HYBRIS_LD_LIBRARY_PATH
 # Do not prepend ALIAS_DIR to LD_LIBRARY_PATH — that breaks Ubuntu-side
 # resolution of Android libui/libnativewindow (GraphicBufferMapper symbols).
 
@@ -740,6 +742,7 @@ ensure_ual_systemd_stub() {
     # Rejected: libff_shm_xrgb.so caused Firefox SIGSEGV + Lomiri crash loops.
     rm -f /tmp/libff_shm_xrgb.so 2>/dev/null || true
     # Drop any prior stub
+    # shellcheck disable=SC2046
     kill $(pidof -x ual_systemd_stub.py) 2>/dev/null || true
     export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR}/bus}"
     /usr/bin/python3 "$stub" >/data/local/tmp/ual_systemd_stub.log 2>&1 &
@@ -794,7 +797,8 @@ ensure_indicators() {
     # Without it: "Error calling StartServiceByName … Timeout" and connect hangs.
     if [ -x /usr/bin/gnome-keyring-daemon ] && ! pgrep -f gnome-keyring-daemon >/dev/null 2>&1; then
         mkdir -p /root/.local/share/keyrings /root/.cache 2>/dev/null || true
-        mkdir -m 0700 -p "${XDG_RUNTIME_DIR:-/run/user/0}/keyring" 2>/dev/null || true
+        mkdir -p "${XDG_RUNTIME_DIR:-/run/user/0}/keyring" 2>/dev/null || true
+        chmod 0700 "${XDG_RUNTIME_DIR:-/run/user/0}/keyring" 2>/dev/null || true
         # --login is incompatible with --start; secrets component only.
         /usr/bin/gnome-keyring-daemon --start --foreground \
             --components=secrets >/data/local/tmp/gnome-keyring.log 2>&1 &

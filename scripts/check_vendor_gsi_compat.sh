@@ -9,6 +9,7 @@ RUN_ID="${RUN_ID:-vendor-compat}"
 
 ROM_DIR="${1:-/home/zero/F8_V2.0_20260313/F8_V2.0_20260313}"
 CONFIG_FILE="$REPO_ROOT/config.env"
+# shellcheck disable=SC1090
 [ -f "$CONFIG_FILE" ] && source "$CONFIG_FILE"
 
 GSI_IMG="${2:-$REPO_ROOT/builder/out/${RELEASE_SYSTEM_IMG:-system.img}}"

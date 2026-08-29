@@ -44,7 +44,9 @@ adb shell 'su 0 /data/local/tmp/drm_prop_dump /dev/dri/card0' >"$DUMP_LOG" 2>&1 
 }
 
 # Expected property names referenced by HWC log / strings (best-effort)
+# shellcheck disable=SC2034
 EXPECTED_CONN="CRTC_ID DPMS EDID PATH TILE link-status non-desktop HDR_SOURCE_METADATA"
+# shellcheck disable=SC2034
 EXPECTED_PLANE="type CRTC_ID FB_ID CRTC_X CRTC_Y CRTC_W CRTC_H SRC_X SRC_Y SRC_W SRC_H IN_FENCE_FD"
 
 python3 - "$DUMP_LOG" "$SYSFS_LOG" "$MD" <<'PY'

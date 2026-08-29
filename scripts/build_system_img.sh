@@ -112,9 +112,7 @@ rmdir "$PHH_MNT"
 
 # Some PHH GSIs are a full Android rootfs (nested /system + /init). F8 boots
 # that layout (H100). Do NOT flatten — Halium files go under /system/...
-KEEP_NESTED=0
 if [ -d "$STAGING/system" ] && [ -f "$STAGING/system/build.prop" ]; then
-    KEEP_NESTED=1
     info "PHH base uses nested /system rootfs — keeping layout (no flatten)"
     SYS_ROOT="$STAGING/system"
 else

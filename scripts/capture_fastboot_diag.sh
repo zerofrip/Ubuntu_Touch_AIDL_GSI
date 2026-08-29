@@ -43,9 +43,11 @@ VARS=(
     done
 } | tee "$OUT_DIR/getvars.txt"
 
+# shellcheck disable=SC2034
 userdata_fs=$(getvar "partition-type:userdata")
 userdata_img_fs="unknown"
 if [ -f "$REPO_ROOT/builder/out/userdata.img" ]; then
+    # shellcheck disable=SC2034
     userdata_img_fs=$(file -b "$REPO_ROOT/builder/out/userdata.img" | head -1)
 fi
 

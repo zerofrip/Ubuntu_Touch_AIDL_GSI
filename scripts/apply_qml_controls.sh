@@ -12,12 +12,12 @@ mkdir -p "$EXTRA"
 for n in Controls Controls.2 Templates.2 PrivateWidgets; do
   src=/data/local/tmp/qml-QtQuick-$n
   [ -d "$src" ] || continue
-  rm -rf "$EXTRA/$n"
+  rm -rf "${EXTRA:?}/$n"
   cp -a "$src" "$EXTRA/$n" 2>/dev/null || continue
   # Best-effort bind into system QML tree.
   mkdir -p "$DST" "$UP" 2>/dev/null
   if [ -e "$UP/$n" ] || [ -L "$UP/$n" ]; then
-    rm -rf "$UP/$n" 2>/dev/null || true
+    rm -rf "${UP:?}/$n" 2>/dev/null || true
   fi
   if [ ! -d "$DST/$n" ]; then
     mkdir -p "$DST/$n" 2>/dev/null || true

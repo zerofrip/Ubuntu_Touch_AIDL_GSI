@@ -9,6 +9,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC2034
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 ROM_DIR="${1:-/home/zero/F8_V2.0_20260313/F8_V2.0_20260313}"
