@@ -4,7 +4,7 @@
 
 .DEFAULT_GOAL := help
 
-.PHONY: help all build build-minimal build-android8-16 phh phh-custom phh-custom-minimal rootfs rootfs-minimal erofs vbmeta system userdata release flash flash-system flash-vbmeta \
+.PHONY: help all build build-minimal build-android8-16 phh phh-custom phh-custom-minimal rootfs rootfs-minimal erofs vbmeta system userdata release dual-system flash flash-system flash-vbmeta \
         check check-device clean lint deepclean gui-install
 
 help: ## Show available targets
@@ -41,14 +41,18 @@ rootfs: ## Build Ubuntu chroot rootfs (requires sudo)
 rootfs-minimal: ## Build minimal Ubuntu chroot rootfs (requires sudo)
 	@sudo GSI_ROOTFS_PROFILE=minimal bash scripts/build_rootfs.sh
 
-erofs: ## Pack chroot rootfs as erofs
-	@bash scripts/build_rootfs_erofs.sh
+erofs: ## Pack chroot rootfs as erofs (sudo: 0700 dirs in rootfs)
+	@sudo bash scripts/build_rootfs_erofs.sh
 
 vbmeta: ## Generate vbmeta-disabled.img
 	@bash scripts/build_vbmeta_disabled.sh
 
 system: ## Compose system.img (requires sudo for loop-mount)
 	@sudo bash scripts/build_system_img.sh
+
+
+dual-system: ## Build HWC + lower-layer system.img pair (sudo for rootfs/erofs/system)
+	@GSI_FORCE_REBUILD_ROOTFS=$${GSI_FORCE_REBUILD_ROOTFS:-0} bash scripts/build_dual_system_imgs.sh
 
 userdata: ## Build userdata.img containing rootfs.erofs A/B seed
 	@bash scripts/build_userdata_img.sh
@@ -101,3 +105,4 @@ deepclean: clean ## Also remove PHH download cache
 
 gui-install: ## Install Lomiri stack manually in chroot
 	@sudo bash gui/install_lomiri.sh
+
