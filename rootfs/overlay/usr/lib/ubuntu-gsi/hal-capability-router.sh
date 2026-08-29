@@ -41,6 +41,7 @@ _pick_tool() {
     _var="$1"
     _name="$2"
     eval "_cur=\$$_var"
+    # shellcheck disable=SC2154
     if [ -x "$_cur" ]; then
         return 0
     fi
@@ -87,7 +88,7 @@ fi
 : "${INV_wifi:=0}" "${INV_backlight:=0}" "${INV_power:=0}" "${INV_vibrator:=0}"
 : "${INV_fingerprint:=0}"
 : "${INV_and_gpu:=0}" "${INV_and_audio:=0}" "${INV_and_bt:=0}" "${INV_and_sensors:=0}"
-: "${INV_and_camera:=0}" "${INV_and_gnss:=0}" "${INV_and_radio:=0}" "${INV_and_wifi:=0}"
+: "${INV_and_camera:=0}" "${INV_and_gnss:=0}" "${INV_and_radio:=0}" "${INV_and_wifi:=0}" "${INV_and_fp:=0}"
 : "${INV_pkg_lomiri:=0}" "${INV_pkg_pulse:=0}" "${INV_pkg_bluez:=0}" "${INV_pkg_iio:=0}"
 : "${INV_pkg_ofono:=0}" "${INV_pkg_nm:=0}" "${INV_pkg_cam:=0}"
 
@@ -246,3 +247,4 @@ fi
 
 log "routes written under $STATUS_DIR"
 exit 0
+

@@ -45,6 +45,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
+# shellcheck disable=SC2034
 BOLD='\033[1m'
 NC='\033[0m'
 
@@ -125,7 +126,9 @@ replace_oem_overlays_fastbootd() {
     ensure_empty_img "$EMPTY_SYSTEM_EXT_IMG" system_ext
 
     local before_product before_sext before_sdlkm
+    # shellcheck disable=SC2034
     before_product=$(part_size_hex product_a)
+    # shellcheck disable=SC2034
     before_sext=$(part_size_hex system_ext_a)
     before_sdlkm=$(part_size_hex system_dlkm_a)
 

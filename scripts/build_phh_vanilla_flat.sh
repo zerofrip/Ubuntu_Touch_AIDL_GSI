@@ -84,7 +84,9 @@ if [[ "$BLOCK_SIZE" =~ ^[0-9]+$ ]] && [[ "$BLOCK_COUNT" =~ ^[0-9]+$ ]]; then
 fi
 
 rm -rf "$STAGING"
+# shellcheck disable=SC2034
 has_ubuntu=$(debugfs -R "stat /etc/init/ubuntu-gsi.rc" "$OUT_IMG" 2>&1 | grep -c "Inode:" || true)
+# shellcheck disable=SC2034
 has_prop=$(debugfs -R "stat /build.prop" "$OUT_IMG" 2>&1 | grep -c "Inode:" || true)
 
 
