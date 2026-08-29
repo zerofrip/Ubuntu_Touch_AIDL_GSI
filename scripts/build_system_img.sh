@@ -165,6 +165,13 @@ install -m 0644 "$HALIUM_DIR/lomiri/README.md" \
 
 success "Halium scaffolding overlaid"
 
+
+# Shrink PHH consumer apps / media for Halium (disable with GSI_SYSTEM_PRUNE=0).
+if [ -f "$REPO_ROOT/scripts/prune_phh_system.sh" ]; then
+    bash "$REPO_ROOT/scripts/prune_phh_system.sh" "$STAGING"
+fi
+
+
 # ---------------------------------------------------------------------------
 # Stage 3: pack ext4 (minimal size)
 # ---------------------------------------------------------------------------
@@ -222,3 +229,4 @@ echo -e "  ${BOLD}Flash with:${NC}"
 echo -e "    fastboot flash system $OUT_IMG"
 echo -e "    fastboot --disable-verity --disable-verification flash vbmeta builder/out/vbmeta-disabled.img"
 echo -e "    fastboot reboot"
+

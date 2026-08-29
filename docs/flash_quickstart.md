@@ -18,6 +18,10 @@ Expected artifacts in `builder/out/`:
 - `userdata.img` (seeds `/data/ubuntu-gsi/rootfs.erofs` + overlay dirs)
 - `linux_rootfs.erofs` (intermediate)
 
+GitHub Releases attach `android-XX_system.img.xz` (compressed). Decompress before
+flashing (`xz -dk android-16.0_system.img.xz`). Uncompressed raw images are also
+on the Actions workflow artifacts tab.
+
 ## 2) Reboot device to fastboot
 
 ```bash
@@ -38,6 +42,9 @@ by default (with size checks).
 ### Manual flash (A/B example)
 
 ```bash
+# From a GitHub Release download:
+# xz -dk android-16.0_system.img.xz
+
 fastboot flash vbmeta_a builder/out/vbmeta-disabled.img
 fastboot flash vbmeta_system_a builder/out/vbmeta-disabled.img
 fastboot flash vbmeta_vendor_a builder/out/vbmeta-disabled.img
@@ -101,3 +108,4 @@ If the system partition is broken, reflash stock system from the OEM package,
 then re-apply this project's `system` + `vbmeta` (and `userdata` if `/data` was wiped).
 
 See also: `docs/halium-architecture.md`, `docs/lower-layer-display.md`.
+
