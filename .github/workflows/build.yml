@@ -44,35 +44,67 @@ jobs:
             -not -path './deprecated/*' \
             -print0 | xargs -0 shellcheck --severity=warning
 
-  build:
-    name: Build Images
+  prepare:
+    name: Prepare matrix
     runs-on: ubuntu-latest
-    needs: lint
-    permissions:
-      contents: write
+    outputs:
+      mode: ${{ steps.set.outputs.mode }}
+      matrix: ${{ steps.set.outputs.matrix }}
+    steps:
+      - name: Resolve build mode and version matrix
+        id: set
+        run: |
+          ref="${GITHUB_REF_NAME}"
+          event="${{ github.event_name }}"
+          all='["android-12.0","android-13.0","android-14.0","android-15.0","android-16.0"]'
+
+          if [ "$event" = "pull_request" ]; then
+            ref="${{ github.base_ref }}"
+          fi
+
+          mode="single"
+          matrix=""
+
+          case "$ref" in
+            main)
+              mode="multi"
+              matrix="$all"
+              ;;
+            v*)
+              # Tag builds publish all vendor system images + shared userdata/vbmeta.
+              mode="multi"
+              matrix="$all"
+              ;;
+            android-12.0|android-13.0|android-14.0|android-15.0|android-16.0)
+              mode="single"
+              matrix="[\"$ref\"]"
+              ;;
+            *)
+              echo "Unsupported ref for build: $ref (event=$event)"
+              exit 1
+              ;;
+          esac
+
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "Resolved mode=$mode matrix=$matrix"
+
+  build-shared:
+    name: Shared userdata + vbmeta
+    runs-on: ubuntu-latest
+    needs: [lint, prepare]
+    if: needs.prepare.outputs.mode == 'multi'
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       CI: "true"
       GSI_CI_MINIMAL_PACKAGES: "1"
+      GSI_ROOTFS_PROFILE: minimal
+      # Vendor env is required by config.env; rootfs/userdata/vbmeta do not vary by PHH version.
+      VENDOR_ANDROID_VERSION: android-16.0
     steps:
       - uses: actions/checkout@v5
         with:
           submodules: false
-
-      - name: Resolve vendor branch and release artifact name
-        id: vendor
-        run: |
-          branch="${GITHUB_REF_NAME}"
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            branch="${{ github.base_ref }}"
-          fi
-          case "$branch" in
-            android-12.0|android-13.0|android-14.0|android-15.0|android-16.0) ;;
-            v*) branch="android-16.0" ;;
-            *) echo "Unsupported branch for build: $branch"; exit 1 ;;
-          esac
-          echo "branch=$branch" >> "$GITHUB_OUTPUT"
-          echo "system_img=${branch}_system.img" >> "$GITHUB_OUTPUT"
 
       - name: Install dependencies
         run: |
@@ -89,77 +121,197 @@ jobs:
             xz-utils \
             android-sdk-libsparse-utils
 
-      - name: Build images
-        env:
-          VENDOR_ANDROID_VERSION: ${{ steps.vendor.outputs.branch }}
+      - name: Build shared rootfs seed + vbmeta
+        run: |
+          chmod +x build.sh scripts/*.sh
+          sudo -E bash scripts/sync_device_phh.sh
+          sudo -E bash scripts/build_rootfs.sh
+          sudo -E bash scripts/build_rootfs_erofs.sh
+          sudo -E bash scripts/build_vbmeta_disabled.sh
+          sudo -E bash scripts/build_userdata_img.sh
+          ls -lh builder/out/linux_rootfs.erofs builder/out/userdata.img builder/out/vbmeta-disabled.img
+
+      - name: Upload shared artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: ubuntu-gsi-shared-${{ github.run_number }}
+          path: |
+            builder/out/linux_rootfs.erofs
+            builder/out/userdata.img
+            builder/out/vbmeta-disabled.img
+          retention-days: ${{ startsWith(github.ref, 'refs/tags/') && 90 || 7 }}
+          if-no-files-found: error
+
+  build:
+    name: Build ${{ matrix.version }}
+    runs-on: ubuntu-latest
+    needs: [lint, prepare, build-shared]
+    if: >
+      always() &&
+      needs.lint.result == 'success' &&
+      needs.prepare.result == 'success' &&
+      (
+        (needs.prepare.outputs.mode == 'multi' && needs.build-shared.result == 'success') ||
+        (needs.prepare.outputs.mode == 'single' && needs.build-shared.result == 'skipped')
+      )
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      CI: "true"
+      GSI_CI_MINIMAL_PACKAGES: "1"
+      VENDOR_ANDROID_VERSION: ${{ matrix.version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: false
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            e2fsprogs \
+            erofs-utils \
+            f2fs-tools \
+            jq \
+            debootstrap \
+            qemu-user-static \
+            wget \
+            unzip \
+            xz-utils \
+            android-sdk-libsparse-utils
+
+      - name: Download shared erofs (multi mode)
+        if: needs.prepare.outputs.mode == 'multi'
+        uses: actions/download-artifact@v5
+        with:
+          name: ubuntu-gsi-shared-${{ github.run_number }}
+          path: builder/out
+
+      - name: Build full images (single mode)
+        if: needs.prepare.outputs.mode == 'single'
         run: |
           chmod +x build.sh scripts/*.sh
           sudo -E bash build.sh
 
-      - name: Verify artifacts
-        env:
-          SYSTEM_IMG: ${{ steps.vendor.outputs.system_img }}
+      - name: Build system image only (multi mode)
+        if: needs.prepare.outputs.mode == 'multi'
         run: |
-          echo "=== Build Artifacts (${{ steps.vendor.outputs.branch }}) ==="
-          ls -lh "builder/out/${SYSTEM_IMG}"
-          ls -lh builder/out/userdata.img
-          ls -lh builder/out/vbmeta-disabled.img
-          ls -lh builder/out/linux_rootfs.erofs
+          chmod +x build.sh scripts/*.sh
+          test -f builder/out/linux_rootfs.erofs
+          sudo -E bash scripts/sync_device_phh.sh
+          sudo -E bash scripts/fetch_phh_gsi.sh
+          sudo -E bash scripts/build_system_img.sh
+          sudo -E bash scripts/package_release_artifacts.sh
 
-      - name: Upload workflow artifacts
-        if: success()
+      - name: Verify artifacts
+        run: |
+          SYS="${VENDOR_ANDROID_VERSION}_system.img"
+          echo "=== Build Artifacts (${VENDOR_ANDROID_VERSION}) mode=${{ needs.prepare.outputs.mode }} ==="
+          ls -lh "builder/out/${SYS}"
+          if [ "${{ needs.prepare.outputs.mode }}" = "single" ]; then
+            ls -lh builder/out/userdata.img
+            ls -lh builder/out/vbmeta-disabled.img
+            ls -lh builder/out/linux_rootfs.erofs
+          fi
+
+      - name: Upload artifacts (single mode)
+        if: success() && needs.prepare.outputs.mode == 'single'
         uses: actions/upload-artifact@v7
         with:
-          name: ubuntu-gsi-${{ steps.vendor.outputs.branch }}-${{ github.run_number }}
+          name: ubuntu-gsi-${{ matrix.version }}-${{ github.run_number }}
           path: |
-            builder/out/${{ steps.vendor.outputs.system_img }}
+            builder/out/${{ matrix.version }}_system.img
             builder/out/userdata.img
             builder/out/vbmeta-disabled.img
             builder/out/linux_rootfs.erofs
           retention-days: ${{ startsWith(github.ref, 'refs/tags/') && 90 || 7 }}
           if-no-files-found: error
 
+      - name: Upload system image (multi mode)
+        if: success() && needs.prepare.outputs.mode == 'multi'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ubuntu-gsi-system-${{ matrix.version }}-${{ github.run_number }}
+          path: builder/out/${{ matrix.version }}_system.img
+          retention-days: ${{ startsWith(github.ref, 'refs/tags/') && 90 || 7 }}
+          if-no-files-found: error
+
+  release:
+    name: GitHub Release
+    runs-on: ubuntu-latest
+    needs: [prepare, build, build-shared]
+    if: >
+      always() &&
+      (startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.tag != '')) &&
+      needs.prepare.result == 'success' &&
+      needs.build.result == 'success' &&
+      (
+        (needs.prepare.outputs.mode == 'multi' && needs.build-shared.result == 'success') ||
+        (needs.prepare.outputs.mode == 'single' && needs.build-shared.result == 'skipped')
+      )
+    permissions:
+      contents: write
+    steps:
+      - name: Download all workflow artifacts
+        uses: actions/download-artifact@v5
+        with:
+          path: release-assets
+
       - name: Prepare release asset list (skip files >= 2GB)
-        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
         id: release_assets
-        env:
-          SYSTEM_IMG: ${{ steps.vendor.outputs.system_img }}
         run: |
           max_size=2147483647
+          mkdir -p staging
           assets=""
-          for f in "builder/out/${SYSTEM_IMG}" builder/out/userdata.img builder/out/vbmeta-disabled.img; do
-            if [ -f "$f" ]; then
-              size=$(stat -c%s "$f")
-              if [ "$size" -le "$max_size" ]; then
-                assets="${assets}${f}\n"
-              else
-                echo "Skipping $f ($size bytes) because GitHub release asset limit is 2GB"
-              fi
+
+          while IFS= read -r -d '' f; do
+            base="$(basename "$f")"
+            case "$base" in
+              android-*_system.img|userdata.img|vbmeta-disabled.img) ;;
+              *) continue ;;
+            esac
+            dest="staging/$base"
+            if [ -e "$dest" ]; then
+              continue
             fi
-          done
+            size=$(stat -c%s "$f")
+            if [ "$size" -gt "$max_size" ]; then
+              echo "Skipping $base ($size bytes) because GitHub release asset limit is 2GB"
+              continue
+            fi
+            cp -f "$f" "$dest"
+            assets="${assets}${dest}\n"
+            echo "Include $base ($size bytes)"
+          done < <(find release-assets -type f -print0)
+
           {
             echo "files<<EOF"
             printf "%b" "$assets"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
+          echo "=== Staging ==="
+          ls -lh staging || true
+
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.tag }}
-          name: Ubuntu GSI ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.tag }} (${{ steps.vendor.outputs.branch }})
+          name: Ubuntu GSI ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.tag }}
           body: |
             ## Ubuntu GSI ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.tag }}
-
-            **Vendor target branch:** `${{ steps.vendor.outputs.branch }}`
 
             ### Artifacts
             | File | Description |
             |------|-------------|
-            | `${{ steps.vendor.outputs.system_img }}` | Flash to `system` partition via fastboot |
-            | `userdata.img` | Seeds `/data/ubuntu-gsi/rootfs.erofs` for the Ubuntu launcher |
-            | `vbmeta-disabled.img` | Flash to `vbmeta` with verity disabled |
+            | `android-XX_system.img` | Per-vendor system image (android-12.0 … android-16.0 when built from `main`) |
+            | `userdata.img` | Shared seed for `/data/ubuntu-gsi/rootfs.erofs` (not vendor-specific) |
+            | `vbmeta-disabled.img` | Shared disabled vbmeta (`flags=3`; not vendor-specific) |
 
             Note: GitHub release assets larger than 2GB are automatically skipped.
             Use workflow artifacts for full-size files when needed.
@@ -170,14 +322,16 @@ jobs:
             fastboot flash vbmeta_system_a vbmeta-disabled.img
             fastboot flash vbmeta_vendor_a vbmeta-disabled.img
             fastboot reboot fastboot
-            fastboot flash system_a ${{ steps.vendor.outputs.system_img }}
+            fastboot flash system_a android-16.0_system.img   # pick matching vendor major
             fastboot flash userdata userdata.img
             fastboot reboot
             ```
+
+            Do **not** pass `--disable-verity` / `--disable-verification` when flashing
+            standalone `vbmeta*.img` (fastboot 34+). Verity is disabled via baked-in `flags=3`.
           files: ${{ steps.release_assets.outputs.files }}
           draft: false
           prerelease: ${{ contains(startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.tag, '-') }}
           fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
