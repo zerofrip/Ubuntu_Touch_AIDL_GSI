@@ -30,12 +30,6 @@ fi
 before="$(du -sh "$SYS_ROOT" 2>/dev/null | cut -f1 || echo unknown)"
 echo "[prune_phh_system] Before: $before ($SYS_ROOT)"
 
-# #region agent log
-_dbg_log="/home/zero/github/Ubuntu_Touch_HIDL_GSI/.cursor/debug-63ebe6.log"
-printf '{"sessionId":"63ebe6","runId":"%s","hypothesisId":"A","location":"prune_phh_system.sh:start","message":"prune start","data":{"sysRoot":"%s","before":"%s"},"timestamp":%s}\n' \
-  "${DEBUG_RUN_ID:-pre-fix}" "$SYS_ROOT" "$before" "$(date +%s%3N)" >> "$_dbg_log" 2>/dev/null || true
-# #endregion
-
 # Consumer / demo apps — Halium stops Android UI after boot_completed.
 # Keep framework packages, Settings*, SystemUI*, KeyChain, PermissionController,
 # PackageInstaller, CertInstaller, and similar boot-critical priv-apps.
@@ -151,8 +145,4 @@ done
 after="$(du -sh "$SYS_ROOT" 2>/dev/null | cut -f1 || echo unknown)"
 echo "[prune_phh_system] After:  $after"
 
-# #region agent log
-printf '{"sessionId":"63ebe6","runId":"%s","hypothesisId":"A","location":"prune_phh_system.sh:end","message":"prune end","data":{"after":"%s"},"timestamp":%s}\n' \
-  "${DEBUG_RUN_ID:-pre-fix}" "$after" "$(date +%s%3N)" >> "$_dbg_log" 2>/dev/null || true
-# #endregion
 
