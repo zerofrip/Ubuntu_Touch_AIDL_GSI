@@ -18,7 +18,7 @@
 service ubuntu-gsi-compat-android /system/usr/lib/ubuntu-gsi/compat/compat-engine.sh android-mode
     user root
     group root system
-    seclabel u:r:su:s0
+    seclabel u:r:phhsu_daemon:s0
     oneshot
     disabled
 
@@ -32,10 +32,12 @@ on property:sys.boot_completed=1
 # -----------------------------------------------------------------------------
 # 2. Ubuntu chroot launcher (late boot)
 # -----------------------------------------------------------------------------
-service ubuntu-gsi-launcher /system/bin/ubuntu-gsi-launcher
+# Exec via labeled /system/bin/sh. Overlay files packed with mkfs.ext4 -d
+# are unlabeled; init (permissive=0) cannot execute unlabeled binaries.
+service ubuntu-gsi-launcher /system/bin/sh /system/bin/ubuntu-gsi-launcher
     user root
     group root system
-    seclabel u:r:su:s0
+    seclabel u:r:phhsu_daemon:s0
     oneshot
     disabled
     stdio_to_kmsg
@@ -60,3 +62,4 @@ on property:sys.boot_completed=1 && property:persist.ubuntu_gsi.enable=
 
 on property:persist.ubuntu_gsi.failed=1
     write /sys/kernel/debug/ubuntu_gsi_failed 1
+
