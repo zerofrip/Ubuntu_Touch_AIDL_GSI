@@ -1238,6 +1238,50 @@ else
     log "Click install marker present — skipping ($CLICK_MARKER)"
 fi
 
+# ---------------------------------------------------------------------------
+# 4q3. Core Apps drawer shortcuts (user applications)
+# ---------------------------------------------------------------------------
+DRAWER_MARKER="/data/uhl_overlay/.core_click_desktops_seeded"
+if [ ! -f "$DRAWER_MARKER" ] && id -u ubuntu >/dev/null 2>&1; then
+    log "Seeding Core Apps shortcuts into ubuntu applications drawer"
+    USER_APPS="/home/ubuntu/.local/share/applications"
+    mkdir -p "$USER_APPS"
+    seeded=0
+    MANIFEST="/usr/share/ubuntu-gsi/preinstalled-click-desktops.list"
+    if [ -f "$MANIFEST" ]; then
+        while IFS= read -r base || [ -n "$base" ]; do
+            base="$(echo "$base" | tr -d '[:space:]')"
+            [ -z "$base" ] && continue
+            src="/usr/share/applications/$base"
+            if [ -f "$src" ]; then
+                cp -a "$src" "$USER_APPS/$base"
+                seeded=$((seeded + 1))
+            fi
+        done < "$MANIFEST"
+    else
+        # Fallback: any system desktop that launches a preinstalled click.
+        for src in /usr/share/applications/*.desktop; do
+            [ -f "$src" ] || continue
+            if grep -q '/opt/click.ubuntu.com/' "$src" 2>/dev/null; then
+                cp -a "$src" "$USER_APPS/$(basename "$src")"
+                seeded=$((seeded + 1))
+            fi
+        done
+    fi
+    # OpenStore apt client shortcut (if present).
+    if [ -f /usr/share/applications/openstore-client.desktop ]; then
+        cp -a /usr/share/applications/openstore-client.desktop \
+            "$USER_APPS/openstore-client.desktop"
+        seeded=$((seeded + 1))
+    fi
+    chown -R ubuntu:ubuntu "$USER_APPS" 2>/dev/null || true
+    date -Iseconds > "$DRAWER_MARKER"
+    log "Seeded $seeded drawer shortcut(s) → $USER_APPS"
+elif [ -f "$DRAWER_MARKER" ]; then
+    log "Drawer shortcut marker present — skipping ($DRAWER_MARKER)"
+fi
+
+
 # Enable SSH
 if [ -f /etc/ssh/sshd_config ]; then
     systemctl enable ssh 2>/dev/null || true
