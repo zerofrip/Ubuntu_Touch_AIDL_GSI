@@ -9,7 +9,10 @@
 #      engine in "android-mode" (equivalent to phhusson's phh-on-boot.sh).
 #   2. After sys.boot_completed=1 (zygote up, animation done), launch
 #      ubuntu-gsi-launcher which performs the chroot pivot into the
-#      Ubuntu rootfs and starts systemd inside it.
+#      Ubuntu rootfs and starts systemd / Lomiri inside it.
+#
+# Auto-start (power-on): launcher starts by default. Opt out with:
+#   adb shell setprop persist.ubuntu_gsi.enable 0
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -25,10 +28,6 @@ service ubuntu-gsi-compat-android /system/usr/lib/ubuntu-gsi/compat/compat-engin
 on property:vendor.early.boot=1
     start ubuntu-gsi-compat-android
 
-on property:sys.boot_completed=1
-    # Re-run for any actions that depend on framework being up.
-    start ubuntu-gsi-compat-android
-
 # -----------------------------------------------------------------------------
 # 2. Ubuntu chroot launcher (late boot)
 # -----------------------------------------------------------------------------
@@ -42,12 +41,11 @@ service ubuntu-gsi-launcher /system/bin/sh /system/bin/ubuntu-gsi-launcher
     disabled
     stdio_to_kmsg
 
-on property:sys.boot_completed=1 && property:persist.ubuntu_gsi.enable=1
-    start ubuntu-gsi-launcher
-
-on property:sys.boot_completed=1 && property:persist.ubuntu_gsi.enable=
-    # First boot: enable by default and start.
-    setprop persist.ubuntu_gsi.enable 1
+# Power-on default: always attempt launcher after Android boot completes.
+# ubuntu-gsi-launcher no-ops when persist.ubuntu_gsi.enable=0 (Android-only).
+on property:sys.boot_completed=1
+    # Re-run compat for any actions that depend on framework being up.
+    start ubuntu-gsi-compat-android
     start ubuntu-gsi-launcher
 
 # -----------------------------------------------------------------------------
@@ -57,9 +55,7 @@ on property:sys.boot_completed=1 && property:persist.ubuntu_gsi.enable=
 # user can boot back to plain Android by:
 #   adb shell setprop persist.ubuntu_gsi.enable 0
 #
-# That property is honoured by the conditions above; on next boot Lomiri
-# will not be started and the user keeps a usable Android.
+# The launcher itself honours enable=0 and will not pivot into Ubuntu.
 
 on property:persist.ubuntu_gsi.failed=1
     write /sys/kernel/debug/ubuntu_gsi_failed 1
-
