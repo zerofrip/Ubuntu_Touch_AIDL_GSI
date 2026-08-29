@@ -4,7 +4,7 @@
 # =============================================================================
 # Started by /system/etc/init/ubuntu-gsi.rc once
 #
-#   property:sys.boot_completed=1 && property:persist.ubuntu_gsi.enable=1
+#   property:sys.boot_completed=1 (skipped when persist.ubuntu_gsi.enable=0)
 #
 # Performs the following pivot:
 #   1. Mount the Ubuntu rootfs.erofs from /system/usr/share/ubuntu-gsi/.
@@ -44,6 +44,20 @@ fail() {
     setprop persist.ubuntu_gsi.failed 1 2>/dev/null || true
     exit "$rc"
 }
+
+# -----------------------------------------------------------------------------
+# Auto-start policy: default ON. Opt out with persist.ubuntu_gsi.enable=0.
+# -----------------------------------------------------------------------------
+_enable="$(getprop persist.ubuntu_gsi.enable 2>/dev/null || true)"
+if [ "$_enable" = "0" ]; then
+    log "persist.ubuntu_gsi.enable=0 — skipping Ubuntu/Lomiri (Android-only boot)"
+    exit 0
+fi
+if [ -z "$_enable" ]; then
+    setprop persist.ubuntu_gsi.enable 1 2>/dev/null || true
+    log "persist.ubuntu_gsi.enable unset — defaulting to 1 (auto-start Lomiri)"
+fi
+
 
 # -----------------------------------------------------------------------------
 # Paths & tunables
