@@ -187,7 +187,7 @@ jobs:
 
       - name: Download shared erofs (multi mode)
         if: needs.prepare.outputs.mode == 'multi'
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: ubuntu-gsi-shared-${{ github.run_number }}
           path: builder/out
@@ -258,21 +258,24 @@ jobs:
       contents: write
     steps:
       - name: Download all workflow artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           path: release-assets
 
-      - name: Prepare release asset list (skip files >= 2GB)
+      - name: Prepare release asset list (xz system images; skip files >= 2GB)
         id: release_assets
         run: |
           max_size=2147483647
           mkdir -p staging
           assets=""
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xz-utils
 
+          # Copy shared small artifacts once.
           while IFS= read -r -d '' f; do
             base="$(basename "$f")"
             case "$base" in
-              android-*_system.img|userdata.img|vbmeta-disabled.img) ;;
+              userdata.img|vbmeta-disabled.img) ;;
               *) continue ;;
             esac
             dest="staging/$base"
@@ -288,6 +291,30 @@ jobs:
             assets="${assets}${dest}\n"
             echo "Include $base ($size bytes)"
           done < <(find release-assets -type f -print0)
+
+          # Compress each system.img so multi-vendor releases fit under 2GB.
+          while IFS= read -r -d '' f; do
+            base="$(basename "$f")"
+            case "$base" in
+              android-*_system.img) ;;
+              *) continue ;;
+            esac
+            xz_name="${base}.xz"
+            dest="staging/$xz_name"
+            if [ -e "$dest" ]; then
+              continue
+            fi
+            echo "Compressing $base -> $xz_name ..."
+            xz -T0 -6 -c -f "$f" > "$dest"
+            size=$(stat -c%s "$dest")
+            if [ "$size" -gt "$max_size" ]; then
+              echo "Skipping $xz_name ($size bytes) because GitHub release asset limit is 2GB"
+              rm -f "$dest"
+              continue
+            fi
+            assets="${assets}${dest}\n"
+            echo "Include $xz_name ($size bytes from $(stat -c%s "$f") raw)"
+          done < <(find release-assets -type f -name 'android-*_system.img' -print0)
 
           {
             echo "files<<EOF"
@@ -309,20 +336,21 @@ jobs:
             ### Artifacts
             | File | Description |
             |------|-------------|
-            | `android-XX_system.img` | Per-vendor system image (android-12.0 … android-16.0 when built from `main`) |
+            | `android-XX_system.img.xz` | Per-vendor system image (compressed; decompress before flash) |
             | `userdata.img` | Shared seed for `/data/ubuntu-gsi/rootfs.erofs` (not vendor-specific) |
             | `vbmeta-disabled.img` | Shared disabled vbmeta (`flags=3`; not vendor-specific) |
 
-            Note: GitHub release assets larger than 2GB are automatically skipped.
-            Use workflow artifacts for full-size files when needed.
+            Note: Assets larger than 2GB after compression are skipped.
+            Uncompressed raw images remain available as workflow artifacts.
 
             ### Flash instructions
             ```sh
+            xz -dk android-16.0_system.img.xz   # pick matching vendor major
             fastboot flash vbmeta_a vbmeta-disabled.img
             fastboot flash vbmeta_system_a vbmeta-disabled.img
             fastboot flash vbmeta_vendor_a vbmeta-disabled.img
             fastboot reboot fastboot
-            fastboot flash system_a android-16.0_system.img   # pick matching vendor major
+            fastboot flash system_a android-16.0_system.img
             fastboot flash userdata userdata.img
             fastboot reboot
             ```
