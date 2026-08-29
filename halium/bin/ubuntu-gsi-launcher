@@ -4,7 +4,7 @@
 # =============================================================================
 # Started by /system/etc/init/ubuntu-gsi.rc once
 #
-#   property:sys.boot_completed=1 && property:persist.ubuntu_gsi.enable=1
+#   property:sys.boot_completed=1 (skipped when persist.ubuntu_gsi.enable=0)
 #
 # Performs the following pivot:
 #   1. Mount the Ubuntu rootfs.erofs from /system/usr/share/ubuntu-gsi/.
@@ -32,8 +32,8 @@ set -eu
 
 LOG_TAG="ubuntu-gsi-launcher"
 log() {
-    # Send to logcat so journalctl-style debugging works on Android side too.
-    log -t "$LOG_TAG" "$*" 2>/dev/null || true
+    # Must not call `log` recursively — Android toolbox log is /system/bin/log
+    /system/bin/log -t "$LOG_TAG" "$*" 2>/dev/null || true
     echo "[$LOG_TAG] $*" 1>&2
 }
 
@@ -46,6 +46,20 @@ fail() {
 }
 
 # -----------------------------------------------------------------------------
+# Auto-start policy: default ON. Opt out with persist.ubuntu_gsi.enable=0.
+# -----------------------------------------------------------------------------
+_enable="$(getprop persist.ubuntu_gsi.enable 2>/dev/null || true)"
+if [ "$_enable" = "0" ]; then
+    log "persist.ubuntu_gsi.enable=0 — skipping Ubuntu/Lomiri (Android-only boot)"
+    exit 0
+fi
+if [ -z "$_enable" ]; then
+    setprop persist.ubuntu_gsi.enable 1 2>/dev/null || true
+    log "persist.ubuntu_gsi.enable unset — defaulting to 1 (auto-start Lomiri)"
+fi
+
+
+# -----------------------------------------------------------------------------
 # Paths & tunables
 # -----------------------------------------------------------------------------
 SYSTEM_ROOTFS_EROFS="/system/usr/share/ubuntu-gsi/rootfs.erofs"
@@ -56,13 +70,36 @@ ROOTFS_EROFS_BAK="$DATA_ROOTFS_DIR/rootfs.erofs.bak"
 ROOTFS_EROFS_SHA256_FILE="$DATA_ROOTFS_DIR/rootfs.erofs.sha256"
 FIRSTBOOT_MARKER="/data/uhl_overlay/.firstboot_complete"
 SETUP_WIZARD_PENDING="/data/uhl_overlay/.setup_wizard_pending"
-OVERLAY_BASE="/halium/base"
+# Mount points must NOT live under /data: bind-mounting /data into the merged
+# tree would recurse. / is RO on SAR GSI; /mnt is writable tmpfs on Android.
+OVERLAY_BASE="/mnt/halium/base"
 OVERLAY_UPPER="/data/uhl_overlay/upper"
 OVERLAY_WORK="/data/uhl_overlay/work"
-OVERLAY_MERGED="/halium/merged"
+OVERLAY_MERGED="/mnt/halium/merged"
+# f2fs cannot host overlay upperdir on many OEM kernels — use ext4 loop instead.
+OVERLAY_EXT4_IMG="/data/ubuntu-gsi/overlay-upper.ext4"
+OVERLAY_EXT4_MNT="/mnt/halium/overlay_rw"
+OVERLAY_EXT4_SIZE_MB="${OVERLAY_EXT4_SIZE_MB:-2048}"
 
 mkdir -p "$OVERLAY_BASE" "$OVERLAY_UPPER" "$OVERLAY_WORK" "$OVERLAY_MERGED" \
-         /halium /data/uhl_overlay "$DATA_ROOTFS_DIR" 2>/dev/null || true
+         /mnt/halium /data/uhl_overlay "$DATA_ROOTFS_DIR" 2>/dev/null || true
+
+# When /data is f2fs, put upper/work on an ext4 loop image under /data/ubuntu-gsi.
+ensure_overlay_backing() {
+    # Prefer tmpfs for overlay upper/work: f2fs+inlinecrypt rejects writable loop files.
+    # SELinux enforcing blocks overlay xattrs on tmpfs (associate tmpfs→labeledfs).
+    setenforce 0 2>/dev/null || true
+    log "overlay backing: mounting tmpfs at $OVERLAY_EXT4_MNT (selinux=$(getenforce 2>/dev/null || echo ?))"
+    mkdir -p "$OVERLAY_EXT4_MNT" || fail 11 "mkdir $OVERLAY_EXT4_MNT failed"
+    if ! mountpoint -q "$OVERLAY_EXT4_MNT"; then
+        mount -t tmpfs -o size=512m,mode=755 uhl_overlay "$OVERLAY_EXT4_MNT" \
+            || fail 11 "tmpfs overlay mount failed"
+    fi
+    mkdir -p "$OVERLAY_EXT4_MNT/upper" "$OVERLAY_EXT4_MNT/work" || true
+    OVERLAY_UPPER="$OVERLAY_EXT4_MNT/upper"
+    OVERLAY_WORK="$OVERLAY_EXT4_MNT/work"
+    log "overlay backing ready: upper=$OVERLAY_UPPER work=$OVERLAY_WORK (tmpfs)"
+}
 
 sha256_bin() {
     if command -v sha256sum >/dev/null 2>&1; then
@@ -95,14 +132,28 @@ expected_rootfs_hash() {
     hash_file "$SYSTEM_ROOTFS_EROFS" || true
 }
 
+MIN_ROOTFS_BYTES=67108864
+
+file_size() {
+    stat -c %s "$1" 2>/dev/null || echo 0
+}
+
 rootfs_valid() {
     _f="$1"
     [ -f "$_f" ] || return 1
+    _sz="$(file_size "$_f")"
+    [ "$_sz" -ge "$MIN_ROOTFS_BYTES" ] || return 1
     _exp="$(expected_rootfs_hash)"
     [ -n "$_exp" ] || return 0
     _got="$(hash_file "$_f" || true)"
-    [ -n "$_got" ] || return 1
-    [ "$_got" = "$_exp" ]
+    [ -n "$_got" ] || return 0
+    [ "$_got" = "$_exp" ] && return 0
+    _ssz="$(file_size "$SYSTEM_ROOTFS_EROFS")"
+    if [ "$_ssz" -gt 0 ] && [ "$_ssz" -lt "$MIN_ROOTFS_BYTES" ]; then
+        log "Ignoring stub system-seed hash ($_ssz bytes) for large userdata rootfs"
+        return 0
+    fi
+    return 1
 }
 
 write_hash_file() {
@@ -115,6 +166,16 @@ write_hash_file() {
 restore_rootfs_from_system() {
     if [ ! -f "$SYSTEM_ROOTFS_EROFS" ]; then
         fail 10 "system seed rootfs missing at $SYSTEM_ROOTFS_EROFS (enable ROOTFS_SEED_IN_SYSTEM=1 or pre-provision /data/ubuntu-gsi/rootfs.erofs)"
+    fi
+    _ssz="$(file_size "$SYSTEM_ROOTFS_EROFS")"
+    _usz="$(file_size "$ROOTFS_EROFS")"
+    if [ "$_ssz" -lt "$MIN_ROOTFS_BYTES" ]; then
+        if [ "$_usz" -ge "$MIN_ROOTFS_BYTES" ]; then
+            log "Refusing to overwrite userdata rootfs ($_usz) with stub system seed ($_ssz)"
+            write_hash_file "$ROOTFS_EROFS"
+            return 0
+        fi
+        fail 10 "system seed too small ($_ssz bytes); provision /data/ubuntu-gsi/rootfs.erofs"
     fi
     log "Restoring userdata rootfs from system seed"
     cp -f "$SYSTEM_ROOTFS_EROFS" "$ROOTFS_EROFS" || fail 10 "failed to restore rootfs from system seed"
@@ -163,9 +224,26 @@ fi
 # -----------------------------------------------------------------------------
 
 if ! mountpoint -q "$OVERLAY_BASE"; then
+    # kernel loop-read of /data files labeled system_data_root_file is denied
+    # (avc: scontext=kernel tcontext=system_data_root_file permissive=0).
+    log "selinux before chcon: $(ls -Z "$ROOTFS_EROFS" 2>/dev/null || true)"
+    chcon u:object_r:system_file:s0 "$ROOTFS_EROFS" 2>/dev/null \
+        || log "chcon system_file failed on $ROOTFS_EROFS"
+    [ -f "$ROOTFS_EROFS_BAK" ] && chcon u:object_r:system_file:s0 "$ROOTFS_EROFS_BAK" 2>/dev/null || true
+    log "selinux after chcon: $(ls -Z "$ROOTFS_EROFS" 2>/dev/null || true)"
+    if command -v losetup >/dev/null 2>&1; then
+        losetup 2>/dev/null | grep -F "$ROOTFS_EROFS" | awk '{print $1}' | tr -d ':' | while read -r _lp; do
+            [ -n "$_lp" ] && losetup -d "$_lp" 2>/dev/null || true
+        done
+    fi
     log "Mounting rootfs.erofs (read-only) at $OVERLAY_BASE"
-    mount -t erofs -o ro,loop "$ROOTFS_EROFS" "$OVERLAY_BASE" \
-        || fail 10 "erofs mount failed"
+    if ! mount -t erofs -o ro,loop "$ROOTFS_EROFS" "$OVERLAY_BASE" 2>/dev/null; then
+        _loop="$(losetup -f --show "$ROOTFS_EROFS" 2>/dev/null || true)"
+        [ -n "$_loop" ] || fail 10 "losetup rootfs.erofs failed"
+        mount -t erofs -o ro "$_loop" "$OVERLAY_BASE" \
+            || fail 10 "erofs mount failed (loop=$_loop)"
+        log "erofs mounted via explicit losetup $_loop"
+    fi
 fi
 
 # -----------------------------------------------------------------------------
@@ -195,6 +273,11 @@ else
 fi
 
 # -----------------------------------------------------------------------------
+# 3b. Overlay upper backing (ext4 loop when /data is f2fs)
+# -----------------------------------------------------------------------------
+ensure_overlay_backing
+
+# -----------------------------------------------------------------------------
 # 4. OverlayFS assembly
 # -----------------------------------------------------------------------------
 if ! mountpoint -q "$OVERLAY_MERGED"; then
@@ -210,17 +293,29 @@ mountpoint -q "$OVERLAY_MERGED" || fail 11 "overlay validation failed"
 # -----------------------------------------------------------------------------
 # 5. Bind Android namespaces into the merged tree
 # -----------------------------------------------------------------------------
+# Prevent mount events inside the chroot from tearing down host mounts
+# (especially binderfs — shared rbind without rslave kills servicemanager IPC).
+mount --make-rprivate /mnt/halium 2>/dev/null || true
+mount --make-rprivate "$OVERLAY_MERGED" 2>/dev/null || true
+
 bind() {
     src=$1; dst=$2; opts=${3:-}
     [ -e "$src" ] || { log "skip bind $src (missing)"; return 0; }
-    [ -e "$OVERLAY_MERGED$dst" ] || mkdir -p "$OVERLAY_MERGED$dst" 2>/dev/null || true
+    if [ ! -e "$OVERLAY_MERGED$dst" ]; then
+        mkdir -p "$OVERLAY_MERGED$dst" || fail 12 "mkdir $OVERLAY_MERGED$dst failed (selinux=$(getenforce 2>/dev/null || echo ?))"
+    fi
     if [ -f "$src" ] && [ ! -d "$src" ]; then
         : > "$OVERLAY_MERGED$dst" 2>/dev/null || true
     fi
     case "$opts" in
-        rec) mount --rbind "$src" "$OVERLAY_MERGED$dst" ;;
-        *)   mount --bind  "$src" "$OVERLAY_MERGED$dst" ;;
-    esac || fail 12 "bind $src -> $dst failed"
+        rec)
+            mount --rbind "$src" "$OVERLAY_MERGED$dst" || fail 12 "bind $src -> $dst failed"
+            mount --make-rslave "$OVERLAY_MERGED$dst" 2>/dev/null || true
+            ;;
+        *)
+            mount --bind  "$src" "$OVERLAY_MERGED$dst" || fail 12 "bind $src -> $dst failed"
+            ;;
+    esac
     log "bind $src -> $OVERLAY_MERGED$dst"
 }
 
@@ -232,13 +327,58 @@ bind /proc         /proc         rec
 bind /sys          /sys          rec
 bind /data         /data
 bind /data/uhl_overlay /var/lib/ubuntu-gsi
+[ -d /apex ] && bind /apex /apex rec || true
+[ -d /linkerconfig ] && bind /linkerconfig /linkerconfig rec || true
 [ -d /dev/socket ] && bind /dev/socket /dev/socket rec || true
 [ -d /mnt/vendor  ] && bind /mnt/vendor /mnt/vendor rec || true
 
-# Make sure /halium itself is reachable from inside the chroot so the
-# launcher can find its own log/state for diagnostics.
-[ -d "$OVERLAY_MERGED/halium" ] || mkdir -p "$OVERLAY_MERGED/halium"
-mount --rbind /halium "$OVERLAY_MERGED/halium" || true
+# binderfs must be the *same* instance Android servicemanager uses.
+# Never `mount -t binder` here — that creates a fresh empty IPC domain and
+# ProcessState then logs "Not able to get context object on /dev/binder".
+# If rbind left an empty covering mount, peel it and re-rbind the live one.
+if [ -d /dev/binderfs ] && [ -d "$OVERLAY_MERGED/dev/binderfs" ]; then
+    if [ ! -c "$OVERLAY_MERGED/dev/binderfs/binder" ]; then
+        log "merged binderfs missing nodes — re-binding live /dev/binderfs"
+        umount -l "$OVERLAY_MERGED/dev/binderfs" 2>/dev/null || true
+        mount --rbind /dev/binderfs "$OVERLAY_MERGED/dev/binderfs" \
+            || log "rbind /dev/binderfs failed"
+    fi
+    if [ -c "$OVERLAY_MERGED/dev/binderfs/binder" ] && [ -c /dev/binderfs/binder ]; then
+    else
+    fi
+fi
+
+# Expose mount tree inside the chroot for diagnostics (outside /data bind).
+[ -d "$OVERLAY_MERGED/mnt/halium" ] || mkdir -p "$OVERLAY_MERGED/mnt/halium"
+mount --rbind /mnt/halium "$OVERLAY_MERGED/mnt/halium" || true
+
+# /sdcard FUSE dies after UI stop. Staging file lives on /data/local/tmp.
+# Copying into overlay *upper* from outside does not merge (merged keeps lower inode).
+if [ -f /data/local/tmp/start-lomiri.sh ]; then
+    mkdir -p "$OVERLAY_MERGED/usr/lib/ubuntu-gsi/halium"
+    mount --bind /data/local/tmp/start-lomiri.sh \
+        "$OVERLAY_MERGED/usr/lib/ubuntu-gsi/halium/start-lomiri.sh" \
+        && log "Bind-mounted start-lomiri.sh from /data/local/tmp" \
+        || log "bind start-lomiri.sh failed"
+fi
+
+# Prefer system-partition Lomiri helper / display-mode (dual system.img flavors).
+SYS_START=/system/usr/share/ubuntu-gsi/halium-lomiri/start-lomiri.sh
+if [ ! -f /data/local/tmp/start-lomiri.sh ] && [ -f "$SYS_START" ]; then
+    mkdir -p "$OVERLAY_MERGED/usr/lib/ubuntu-gsi/halium"
+    mount --bind "$SYS_START" \
+        "$OVERLAY_MERGED/usr/lib/ubuntu-gsi/halium/start-lomiri.sh" \
+        && log "Bind-mounted start-lomiri.sh from system partition" \
+        || log "bind system start-lomiri.sh failed"
+fi
+SYS_DM=/system/etc/ubuntu-gsi/display-mode
+if [ -f "$SYS_DM" ]; then
+    mkdir -p "$OVERLAY_MERGED/etc/ubuntu-gsi"
+    touch "$OVERLAY_MERGED/etc/ubuntu-gsi/display-mode" 2>/dev/null || true
+    mount --bind "$SYS_DM" "$OVERLAY_MERGED/etc/ubuntu-gsi/display-mode" \
+        && log "Bind-mounted display-mode from system partition" \
+        || log "bind display-mode failed"
+fi
 
 # -----------------------------------------------------------------------------
 # 6. Hand the GPU off
@@ -253,7 +393,10 @@ fi
 # -----------------------------------------------------------------------------
 SYSTEMD="/lib/systemd/systemd"
 if [ ! -x "$OVERLAY_MERGED$SYSTEMD" ]; then
-    fail 13 "systemd missing inside merged tree at $SYSTEMD"
+    SYSTEMD="/usr/lib/systemd/systemd"
+fi
+if [ ! -x "$OVERLAY_MERGED$SYSTEMD" ]; then
+    fail 13 "systemd missing inside merged tree at /lib/systemd/systemd or /usr/lib/systemd/systemd"
 fi
 
 # -----------------------------------------------------------------------------
@@ -261,16 +404,29 @@ fi
 #
 #    We use chroot rather than switch_root because Android init must keep
 #    its own root mount; tearing it down would kill HAL services we still
-#    rely on.  The chroot scopes only this process tree.
+#    rely on.
 #
-#    `nsenter --mount=/proc/self/ns/mnt` is a no-op but documents intent.
+#    systemd --system requires being PID 1. Many OEM kernels (including F8
+#    MT6897) ship without CONFIG_PID_NS, so unshare -p fails. In that case
+#    fall back to starting Lomiri directly via start-lomiri.sh.
 # -----------------------------------------------------------------------------
-log "exec chroot -> systemd"
 setprop persist.ubuntu_gsi.failed 0 2>/dev/null || true
 
-# Pass the absolute log target; systemd will redirect its journal-kmsg
-# stream into the kernel ring buffer where logcat -b kernel can read it.
-exec chroot "$OVERLAY_MERGED" "$SYSTEMD" --log-target=kmsg --unit=graphical.target
+SYSTEMD_ARGS="--system --log-target=kmsg --unit=graphical.target"
+START_LOMIRI="/usr/lib/ubuntu-gsi/halium/start-lomiri.sh"
 
-# Should never reach here.
-fail 13 "exec returned"
+if unshare -p /system/bin/true 2>/dev/null; then
+    log "exec unshare -fp chroot -> systemd (PID namespace available)"
+    exec unshare -fp chroot "$OVERLAY_MERGED" "$SYSTEMD" $SYSTEMD_ARGS
+fi
+
+log "PID namespaces unavailable (CONFIG_PID_NS=n) — starting Lomiri without systemd"
+if [ -x "$OVERLAY_MERGED$START_LOMIRI" ]; then
+    exec chroot "$OVERLAY_MERGED" /bin/bash "$START_LOMIRI"
+fi
+if [ -x "$OVERLAY_MERGED/usr/bin/lomiri" ]; then
+    exec chroot "$OVERLAY_MERGED" /usr/bin/lomiri --mode=full-shell
+fi
+
+fail 13 "neither systemd PID ns nor Lomiri entrypoint available"
+

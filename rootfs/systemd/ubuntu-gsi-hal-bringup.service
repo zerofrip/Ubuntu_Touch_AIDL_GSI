@@ -1,0 +1,17 @@
+[Unit]
+Description=Ubuntu GSI HAL capability router (enumerate + kernel-first bring-up)
+Documentation=file:///usr/share/doc/ubuntu-gsi/hal-bridge-matrix.md
+After=local-fs.target systemd-udev-settle.service
+Before=lomiri.service
+Wants=systemd-udev-settle.service
+ConditionPathExists=/usr/lib/ubuntu-gsi/hal-capability-router.sh
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Router runs: enumerate → route → kernel bringup → optional wifi → one-shot AIDL probe
+ExecStart=/usr/lib/ubuntu-gsi/hal-capability-router.sh
+TimeoutStartSec=60
+
+[Install]
+WantedBy=multi-user.target graphical.target

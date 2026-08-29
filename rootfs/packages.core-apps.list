@@ -1,0 +1,13 @@
+# =============================================================================
+# UBports Core Apps — apt packages available on repo.ubports.com (focal/main)
+# Source: ubuntu-touch/CORE_APPS.md
+# Merged into rootfs apt install by scripts/build_rootfs.sh
+# Terminal is OpenStore click com.ubuntu.terminal (clicks.core-apps.list);
+#   build_rootfs unpacks it into /opt/click.ubuntu.com/.
+# X11 support: xwayland-hybris is in rootfs/packages.list (Halium).
+# =============================================================================
+morph-browser
+dialer-app
+messaging-app
+address-book-app
+mediaplayer-app

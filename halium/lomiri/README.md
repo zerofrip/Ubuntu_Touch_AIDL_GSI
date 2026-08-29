@@ -1,20 +1,23 @@
 # Halium-style Lomiri Bring-up Notes (AIDL Variant)
 
-This directory contains the **scaffolding** that the Ubuntu Touch shell
-(Lomiri / Mir) needs once `ubuntu-gsi-launcher` has chrooted into the
-Ubuntu rootfs.
+This directory holds the Lomiri / Mir startup path used after
+`ubuntu-gsi-launcher` chroots into the Ubuntu rootfs.
 
-> The exact, device-tested launch sequence still requires per-vendor tuning
-> and the libhybris build artefacts that match the Android base on the
-> device. Treat these scripts as a documented starting point, not a
-> turnkey implementation.
+`start-lomiri.sh` is the body of `lomiri.service`. On current images it also
+wires indicators/secrets helpers and an app-networking watchdog that calls
+`halium-app-net.sh`. Runtime copies may be overlaid from
+`rootfs/overlay/usr/lib/ubuntu-gsi/` or bind-mounted for device debugging.
+
+> Per-vendor GPU/libhybris artefacts still need matching the device Android
+> base. Use this checklist together with `docs/hal-bridge-matrix.md` and
+> `docs/lower-layer-display.md`.
 
 ## Files
 
 | File | Role |
 |------|------|
-| `start-lomiri.sh` | Body of `lomiri.service` inside the chroot. Sets every libhybris environment variable and `exec`s the Lomiri shell. |
-| `README.md` (this file) | Step-by-step bring-up checklist + references. |
+| `start-lomiri.sh` | Body of `lomiri.service`: libhybris env, indicators, app-net watchdog, then Lomiri. |
+| `README.md` (this file) | Bring-up checklist + references. |
 
 ## Pre-requisites the rootfs must satisfy
 

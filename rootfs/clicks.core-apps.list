@@ -1,0 +1,21 @@
+# =============================================================================
+# UBports Core Apps — OpenStore Click IDs (not in focal apt)
+# Source: ubuntu-touch/CORE_APPS.md
+# Fetched by scripts/fetch_openstore_clicks.sh → builder/cache/openstore-clicks/
+# Bundled into rootfs at /usr/share/ubuntu-gsi/preinstalled-clicks/
+# =============================================================================
+calculator.ubports
+calendar.ubports
+docviewer.ubports
+filemanager.ubports
+gallery.ubports
+com.ubuntu.reminders
+openstore.openstore-team
+teleports.ubports
+com.ubuntu.terminal
+com.ubuntu.ubports
+weather.ubports
+camera.ubports
+clock.ubports
+music.ubports
+# Printing (ubuntu-printing-app) — no stable OpenStore ID; excluded

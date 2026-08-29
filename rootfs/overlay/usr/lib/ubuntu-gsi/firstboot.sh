@@ -404,8 +404,8 @@ if [ -e /sys/class/timed_output/vibrator/enable ]; then
     log "timed_output vibrator permissions set"
 fi
 
-# LED-class vibrator
-for led in /sys/class/leds/vibrator /sys/class/leds/vibrator_0; do
+# LED-class vibrator (any vibrator* name — device-agnostic)
+for led in /sys/class/leds/vibrator*; do
     if [ -d "$led" ]; then
         chmod 0666 "$led/brightness" 2>/dev/null || true
         chmod 0666 "$led/activate" 2>/dev/null || true
@@ -440,12 +440,40 @@ log "Hall sensor udev rules installed"
 # ---------------------------------------------------------------------------
 log "Configuring WiFi subsystem"
 
+# MediaTek Halium bring-up (wmtWifi '1', rfkill state=1, udev seed)
+if [ -x /usr/lib/ubuntu-gsi/wifi-bringup.sh ]; then
+    /usr/lib/ubuntu-gsi/wifi-bringup.sh || true
+    log "wifi-bringup.sh executed"
+fi
+
+# Phase 1 HAL bring-up (permissions + daemons) every first boot path
+if [ -x /usr/lib/ubuntu-gsi/hal-kernel-bringup.sh ]; then
+    /usr/lib/ubuntu-gsi/hal-kernel-bringup.sh || true
+    log "hal-kernel-bringup.sh executed"
+fi
+if [ -x /usr/lib/ubuntu-gsi/hal-aidl-probe.sh ]; then
+    /usr/lib/ubuntu-gsi/hal-aidl-probe.sh || true
+    log "hal-aidl-probe.sh executed"
+fi
+if systemctl list-unit-files ubuntu-gsi-hal-bringup.service >/dev/null 2>&1; then
+    systemctl enable ubuntu-gsi-hal-bringup.service 2>/dev/null || true
+    log "ubuntu-gsi-hal-bringup.service enabled"
+fi
+
 # Unblock WiFi radios (some vendors ship with soft-block)
 if command -v rfkill >/dev/null 2>&1; then
     rfkill unblock wifi 2>/dev/null || true
     rfkill unblock all 2>/dev/null || true
     log "rfkill: unblocked WiFi radios"
 fi
+# Kernel ABI: /sys/class/rfkill/*/state — 0=soft-block, 1=unblocked
+for rk in /sys/class/rfkill/rfkill*; do
+    [ -e "$rk/type" ] || continue
+    typ=$(cat "$rk/type" 2>/dev/null || true)
+    if [ "$typ" = "wlan" ] || [ "$typ" = "wifi" ]; then
+        echo 1 > "$rk/state" 2>/dev/null || true
+    fi
+done
 
 # Symlink vendor WiFi firmware into Linux firmware search path
 for fw_dir in \
@@ -480,6 +508,10 @@ fi
 # Configure NetworkManager WiFi backend
 mkdir -p /etc/NetworkManager/conf.d
 cat > /etc/NetworkManager/conf.d/wifi.conf << 'NMWIFI'
+[main]
+dns=default
+rc-manager=file
+
 [device]
 wifi.scan-rand-mac-address=no
 wifi.backend=wpa_supplicant
@@ -487,6 +519,40 @@ wifi.backend=wpa_supplicant
 [connectivity]
 enabled=true
 NMWIFI
+
+# App DNS: Halium has no systemd-resolved — write nameservers to /etc/resolv.conf
+cat > /etc/NetworkManager/conf.d/99-dns-file.conf << 'NMDNS'
+[main]
+dns=default
+rc-manager=file
+NMDNS
+
+if [ ! -f /etc/nsswitch.conf ] || ! grep -qE '^[[:space:]]*hosts:.*dns' /etc/nsswitch.conf 2>/dev/null; then
+    cat > /etc/nsswitch.conf << 'NSS'
+passwd:         files
+group:          files
+shadow:         files
+gshadow:        files
+hosts:          files dns
+networks:       files
+protocols:      db files
+services:       db files
+ethers:         db files
+rpc:            db files
+netgroup:       nis
+NSS
+    log "nsswitch hosts: files dns"
+fi
+if [ -L /etc/resolv.conf ]; then
+    _rt=$(readlink -f /etc/resolv.conf 2>/dev/null || true)
+    case "$_rt" in
+        *stub-resolv*|*systemd*) rm -f /etc/resolv.conf; log "removed stub resolv.conf" ;;
+    esac
+fi
+if [ ! -f /etc/resolv.conf ] || ! grep -qE '^[[:space:]]*nameserver' /etc/resolv.conf 2>/dev/null; then
+    printf 'nameserver 8.8.8.8\nnameserver 1.1.1.1\n' > /etc/resolv.conf
+    log "seeded fallback resolv.conf"
+fi
 
 # Set regulatory domain from vendor if available
 if [ -f /vendor/build.prop ]; then
@@ -809,9 +875,9 @@ log "Configuring biometric authentication"
 # -- Fingerprint --
 FP_DETECTED=0
 
-# Detect fingerprint device (sysfs, /dev, vendor init.rc)
-for fp_dev in /dev/fingerprint* /dev/goodix_fp /dev/fpc1020 /dev/silead_fp \
-              /dev/elan_fp /dev/cdfinger /dev/sunwave_fp; do
+# Detect fingerprint device (generic globs first, then known vendor nodes)
+for fp_dev in /dev/fingerprint* /dev/fpsensor* /dev/*_fp /dev/goodix* \
+              /dev/fpc* /dev/silead* /dev/elan_fp /dev/cdfinger /dev/sunwave_fp; do
     if [ -c "$fp_dev" ] || [ -e "$fp_dev" ]; then
         chmod 0660 "$fp_dev" 2>/dev/null || true
         chgrp input "$fp_dev" 2>/dev/null || true
@@ -834,14 +900,14 @@ fi
 
 # Udev rule for fingerprint devices
 cat > /etc/udev/rules.d/80-fingerprint.rules <<'FPEOF'
-# Fingerprint reader devices
+# Fingerprint reader devices (generic patterns — works across OEMs)
 KERNEL=="fingerprint*", MODE="0660", GROUP="input"
-KERNEL=="goodix_fp", MODE="0660", GROUP="input"
-KERNEL=="fpc1020", MODE="0660", GROUP="input"
-KERNEL=="silead_fp", MODE="0660", GROUP="input"
-KERNEL=="elan_fp", MODE="0660", GROUP="input"
-KERNEL=="cdfinger", MODE="0660", GROUP="input"
-KERNEL=="sunwave_fp", MODE="0660", GROUP="input"
+KERNEL=="fpsensor*", MODE="0660", GROUP="input"
+KERNEL=="*_fp", MODE="0660", GROUP="input"
+KERNEL=="goodix*", MODE="0660", GROUP="input"
+KERNEL=="fpc*", MODE="0660", GROUP="input"
+KERNEL=="silead*", MODE="0660", GROUP="input"
+KERNEL=="cdfinger*", MODE="0660", GROUP="input"
 FPEOF
 
 if command -v fprintd >/dev/null 2>&1; then
@@ -1138,6 +1204,84 @@ else
     log "WARN: openstore-client not found — click apps unavailable"
 fi
 
+
+# ---------------------------------------------------------------------------
+# 4q2. Preinstalled + user Click packages
+# ---------------------------------------------------------------------------
+CLICK_MARKER="/data/uhl_overlay/.core_clicks_installed"
+if [ ! -f "$CLICK_MARKER" ]; then
+    log "Installing preinstalled / user Click packages"
+    install_click() {
+        local c="$1"
+        [ -f "$c" ] || return 0
+        log "  click: $c"
+        export PATH="/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
+        if command -v pkcon >/dev/null 2>&1; then
+            pkcon install-local --allow-untrusted "$c" >>"$LOG" 2>&1 || true
+        elif command -v click >/dev/null 2>&1; then
+            # Halium: frameworks may be incomplete; force + register for ubuntu.
+            click install --force-missing-framework --allow-unauthenticated --user=ubuntu "$c" >>"$LOG" 2>&1 \
+                || click install --force-missing-framework --allow-unauthenticated --all-users "$c" >>"$LOG" 2>&1 || true
+        else
+            log "  WARN: pkcon/click not available for $c"
+        fi
+    }
+    for c in /usr/share/ubuntu-gsi/preinstalled-clicks/*.click; do
+        install_click "$c"
+    done
+    for c in /data/ubuntu-gsi/user-packages/clicks/*.click; do
+        install_click "$c"
+    done
+    date -Iseconds > "$CLICK_MARKER"
+    log "Click install pass complete → $CLICK_MARKER"
+else
+    log "Click install marker present — skipping ($CLICK_MARKER)"
+fi
+
+# ---------------------------------------------------------------------------
+# 4q3. Core Apps drawer shortcuts (user applications)
+# ---------------------------------------------------------------------------
+DRAWER_MARKER="/data/uhl_overlay/.core_click_desktops_seeded"
+if [ ! -f "$DRAWER_MARKER" ] && id -u ubuntu >/dev/null 2>&1; then
+    log "Seeding Core Apps shortcuts into ubuntu applications drawer"
+    USER_APPS="/home/ubuntu/.local/share/applications"
+    mkdir -p "$USER_APPS"
+    seeded=0
+    MANIFEST="/usr/share/ubuntu-gsi/preinstalled-click-desktops.list"
+    if [ -f "$MANIFEST" ]; then
+        while IFS= read -r base || [ -n "$base" ]; do
+            base="$(echo "$base" | tr -d '[:space:]')"
+            [ -z "$base" ] && continue
+            src="/usr/share/applications/$base"
+            if [ -f "$src" ]; then
+                cp -a "$src" "$USER_APPS/$base"
+                seeded=$((seeded + 1))
+            fi
+        done < "$MANIFEST"
+    else
+        # Fallback: any system desktop that launches a preinstalled click.
+        for src in /usr/share/applications/*.desktop; do
+            [ -f "$src" ] || continue
+            if grep -q '/opt/click.ubuntu.com/' "$src" 2>/dev/null; then
+                cp -a "$src" "$USER_APPS/$(basename "$src")"
+                seeded=$((seeded + 1))
+            fi
+        done
+    fi
+    # OpenStore apt client shortcut (if present).
+    if [ -f /usr/share/applications/openstore-client.desktop ]; then
+        cp -a /usr/share/applications/openstore-client.desktop \
+            "$USER_APPS/openstore-client.desktop"
+        seeded=$((seeded + 1))
+    fi
+    chown -R ubuntu:ubuntu "$USER_APPS" 2>/dev/null || true
+    date -Iseconds > "$DRAWER_MARKER"
+    log "Seeded $seeded drawer shortcut(s) → $USER_APPS"
+elif [ -f "$DRAWER_MARKER" ]; then
+    log "Drawer shortcut marker present — skipping ($DRAWER_MARKER)"
+fi
+
+
 # Enable SSH
 if [ -f /etc/ssh/sshd_config ]; then
     systemctl enable ssh 2>/dev/null || true
@@ -1199,3 +1343,4 @@ log "═════════════════════════
 log "  First boot complete!"
 log "  GUI Setup Wizard will launch after Lomiri starts."
 log "═══════════════════════════════════════════════════"
+
