@@ -97,7 +97,14 @@ Release artifacts under `builder/out/`:
 - `vbmeta-disabled.img`
 - `linux_rootfs.erofs` (intermediate)
 
-`main` does not build release images. Checkout an `android-*` branch first.
+`main` is documentation-first for day-to-day commits, but **Actions → Build Ubuntu GSI → Run workflow** on `main` builds all vendor majors:
+
+- `android-12.0_system.img` … `android-16.0_system.img` (PHH/TrebleDroid base differs per version)
+- `userdata.img` and `vbmeta-disabled.img` once each (shared; not vendor-specific)
+- Optional release tag input attaches those assets to a GitHub Release
+
+For a single-version local/CI build, checkout the matching `android-*` branch instead.
+
 
 ## Flash
 
@@ -206,6 +213,12 @@ Rootfs persistence/self-heal:
 - Restore source is system seed `/system/usr/share/ubuntu-gsi/rootfs.erofs`
 - `ROOTFS_SEED_IN_SYSTEM=0` keeps `system.img` smaller, but removes reset-time seed restore
 
+
+## CI multi-version (`main`)
+
+From the Actions tab, run **Build Ubuntu GSI** on branch `main` (`workflow_dispatch`).
+That produces every `android-XX_system.img` plus one shared `userdata.img` and
+`vbmeta-disabled.img`. Set the optional tag input to publish a GitHub Release.
 
 ## Documentation
 
