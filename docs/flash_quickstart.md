@@ -1,18 +1,22 @@
 # Flash Quickstart (Halium-style, AIDL)
 
-This quickstart assumes you want to keep stock `boot.img` and stock kernel unchanged.
+Keep stock `boot.img` and stock kernel unchanged. Flash only `system`, disabled
+`vbmeta*`, and (on first install) `userdata`.
 
 ## 1) Build
 
 ```bash
 cd Ubuntu_Touch_AIDL_GSI
-make build
+git checkout android-16.0   # or android-12.0 … android-15.0 matching vendor
+make build-minimal
 ```
 
 Expected artifacts in `builder/out/`:
 
-- `system.img`
+- `android-XX_system.img` (e.g. `android-16.0_system.img`; `system.img` symlink may exist)
 - `vbmeta-disabled.img`
+- `userdata.img` (seeds `/data/ubuntu-gsi/rootfs.erofs` + overlay dirs)
+- `linux_rootfs.erofs` (intermediate)
 
 ## 2) Reboot device to fastboot
 
@@ -22,19 +26,56 @@ adb reboot bootloader
 
 or use hardware keys.
 
-## 3) Flash only system + vbmeta
+## 3) Flash (recommended: Makefile)
 
 ```bash
-fastboot --disable-verity --disable-verification flash vbmeta builder/out/vbmeta-disabled.img
-fastboot flash system builder/out/system.img
+make flash
+```
+
+This runs `scripts/flash.sh` and flashes **system + vbmeta-disabled + userdata**
+by default (with size checks).
+
+### Manual flash (A/B example)
+
+```bash
+fastboot flash vbmeta_a builder/out/vbmeta-disabled.img
+fastboot flash vbmeta_system_a builder/out/vbmeta-disabled.img
+fastboot flash vbmeta_vendor_a builder/out/vbmeta-disabled.img
+fastboot reboot fastboot
+fastboot flash system_a builder/out/android-16.0_system.img
+fastboot flash userdata builder/out/userdata.img
 fastboot reboot
 ```
 
-Do **not** flash `boot`, `vendor_boot`, `dtbo`, `vendor`, or `userdata`.
+Do **not** pass `--disable-verity` / `--disable-verification` when flashing
+standalone `vbmeta*.img` files. On fastboot 34+, that path fails with
+`Failed to find AVB_MAGIC at offset: 0`. Verity is disabled by baking
+`flags=3` into `vbmeta-disabled.img` at build time.
+
+Do **not** flash `boot`, `vendor_boot`, `dtbo`, or `vendor`.
+
+### When to flash userdata
+
+| Situation | userdata |
+|-----------|----------|
+| First install / factory reset / empty `/data` | **Flash** (`make flash` or `--userdata-only`) |
+| Refresh rootfs seed + wipe `/data` | **Flash** |
+| Everyday system (and/or vbmeta) update with existing `/data/ubuntu-gsi` | **Skip** (`make flash-system` or `bash scripts/flash.sh --no-userdata`) |
+
+Flashing `userdata` wipes Android `/data` (apps, Wi‑Fi, settings).
+
+Selective targets:
+
+```bash
+make flash-system
+make flash-vbmeta
+bash scripts/flash.sh --no-userdata
+bash scripts/flash.sh --userdata-only
+```
 
 ## 4) Runtime toggle
 
-Enable launcher:
+Enable launcher (default is auto-on from init rules):
 
 ```bash
 adb shell setprop persist.ubuntu_gsi.enable 1
@@ -49,11 +90,14 @@ adb reboot
 
 ## 5) Recovery path
 
-If the UI does not come up, return to Android-only userspace:
+If Lomiri does not come up, return to Android-only userspace:
 
 ```bash
 adb shell setprop persist.ubuntu_gsi.enable 0
 adb reboot
 ```
 
-If system partition is broken, reflash stock system from OEM package.
+If the system partition is broken, reflash stock system from the OEM package,
+then re-apply this project's `system` + `vbmeta` (and `userdata` if `/data` was wiped).
+
+See also: `docs/halium-architecture.md`, `docs/lower-layer-display.md`.
