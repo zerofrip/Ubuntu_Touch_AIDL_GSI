@@ -389,24 +389,64 @@ printf '%s\n' "$GSI_DISPLAY_MODE" > "$TARGET_DIR/etc/ubuntu-gsi/display-mode"
 echo ""
 
 info "Phase 4.5 — Bundling preinstalled OpenStore clicks"
+# Fetch Core Apps clicks unless explicitly skipped (missing apps do not abort).
+if [ "${GSI_SKIP_CLICK_FETCH:-0}" = "1" ]; then
+    info "GSI_SKIP_CLICK_FETCH=1 — skipping OpenStore fetch"
+elif [ -x "$REPO_ROOT/scripts/fetch_openstore_clicks.sh" ] || [ -f "$REPO_ROOT/scripts/fetch_openstore_clicks.sh" ]; then
+    info "Fetching OpenStore clicks from rootfs/clicks.core-apps.list"
+    bash "$REPO_ROOT/scripts/fetch_openstore_clicks.sh" || \
+        info "WARN: fetch_openstore_clicks.sh exited non-zero — continuing with cache"
+else
+    info "fetch_openstore_clicks.sh missing — using cache only"
+fi
+
 PRECLICK_DST="$TARGET_DIR/usr/share/ubuntu-gsi/preinstalled-clicks"
-mkdir -p "$PRECLICK_DST"
+DESKTOP_MANIFEST="$TARGET_DIR/usr/share/ubuntu-gsi/preinstalled-click-desktops.list"
+mkdir -p "$PRECLICK_DST" "$(dirname "$DESKTOP_MANIFEST")"
+: > "$DESKTOP_MANIFEST"
 click_count=0
-if [ -d "$CLICK_CACHE_DIR" ] && ls "$CLICK_CACHE_DIR"/*.click >/dev/null 2>&1; then
-    for c in "$CLICK_CACHE_DIR"/*.click; do
-        cp -a "$c" "$PRECLICK_DST/"
-        click_count=$((click_count + 1))
-    done
+# Only stage clicks named in clicks.core-apps.list (ignore leftover cache files).
+CLICK_LIST_FILE="$REPO_ROOT/rootfs/clicks.core-apps.list"
+if [ -f "$CLICK_LIST_FILE" ] && [ -d "$CLICK_CACHE_DIR" ]; then
+    while IFS= read -r app_id || [ -n "$app_id" ]; do
+        app_id="${app_id%%#*}"
+        app_id="$(echo "$app_id" | tr -d '[:space:]')"
+        [ -z "$app_id" ] && continue
+        src="$CLICK_CACHE_DIR/${app_id}_arm64.click"
+        if [ -f "$src" ]; then
+            cp -a "$src" "$PRECLICK_DST/"
+            click_count=$((click_count + 1))
+        else
+            info "WARN: click not in cache: $app_id"
+        fi
+    done < "$CLICK_LIST_FILE"
+fi
+if [ "$click_count" -gt 0 ]; then
     success "Copied $click_count click(s) → /usr/share/ubuntu-gsi/preinstalled-clicks/"
 else
-    info "No clicks in $CLICK_CACHE_DIR (run scripts/fetch_openstore_clicks.sh first)"
+    info "No clicks staged (run scripts/fetch_openstore_clicks.sh or unset GSI_SKIP_CLICK_FETCH)"
 fi
+
 # Unpack clicks into /opt/click.ubuntu.com so Terminal etc. work without flaky
 # `click install` under Android/Halium (SELinux / missing frameworks).
 CLICK_OPT="$TARGET_DIR/opt/click.ubuntu.com"
 APPS_DST="$TARGET_DIR/usr/share/applications"
 mkdir -p "$CLICK_OPT" "$APPS_DST"
 unpacked=0
+
+# Make a .desktop visible in the Lomiri app drawer.
+tune_drawer_desktop() {
+    local desk_file="$1"
+    [ -f "$desk_file" ] || return 0
+    sed -i \
+        -e 's/^NoDisplay=.*/NoDisplay=false/' \
+        -e 's/^Hidden=.*/Hidden=false/' \
+        "$desk_file" 2>/dev/null || true
+    if ! grep -qE '^X-Ubuntu-Touch=' "$desk_file"; then
+        printf '\nX-Ubuntu-Touch=true\n' >> "$desk_file"
+    fi
+}
+
 for c in "$PRECLICK_DST"/*.click; do
     [ -f "$c" ] || continue
     tmp=$(mktemp -d)
@@ -439,11 +479,14 @@ for c in "$PRECLICK_DST"/*.click; do
             sed -i "s|^Exec=.*|Exec=/opt/click.ubuntu.com/$pkg/current/lib/aarch64-linux-gnu/bin/terminal %u|" \
                 "$APPS_DST/$base" 2>/dev/null || true
         fi
+        tune_drawer_desktop "$APPS_DST/$base"
+        echo "$base" >> "$DESKTOP_MANIFEST"
     done < <(find "$dest" -name '*.desktop' -print0 2>/dev/null)
     rm -rf "$tmp"
     unpacked=$((unpacked + 1))
 done
 if [ "$unpacked" -gt 0 ]; then
+    sort -u -o "$DESKTOP_MANIFEST" "$DESKTOP_MANIFEST"
     success "Unpacked $unpacked click(s) → /opt/click.ubuntu.com/ (+ .desktop)"
 fi
 mkdir -p "$(dirname "$CLICK_MISSING_FILE")"
@@ -550,4 +593,5 @@ echo -e "${GREEN}${BOLD}  ✔  Rootfs build complete: $TARGET_DIR${NC}"
 echo -e "${BOLD}═══════════════════════════════════════════════════════════════${NC}"
 echo ""
 echo -e "  Next: bash scripts/build_rootfs_erofs.sh"
+
 
