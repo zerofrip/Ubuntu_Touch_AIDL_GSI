@@ -3,18 +3,17 @@ Description=Lomiri Desktop Shell (Ubuntu Touch)
 Documentation=https://github.com/nicofrand/lomiri
 After=ubuntu-gsi-hal-bringup.service graphical.target dbus.service
 Wants=ubuntu-gsi-hal-bringup.service dbus.service
-ConditionPathExists=/usr/bin/lomiri
+ConditionPathExists=/usr/lib/ubuntu-gsi/halium/start-lomiri.sh
 
 [Service]
 Type=simple
-User=ubuntu
+User=root
 Environment=XDG_RUNTIME_DIR=/run/user/1000
 Environment=WAYLAND_DISPLAY=wayland-0
-ExecStartPre=/usr/lib/ubuntu-gsi/gui/start_lomiri.sh --setup
-ExecStart=/usr/lib/ubuntu-gsi/gui/start_lomiri.sh
+ExecStart=/bin/bash /usr/lib/ubuntu-gsi/halium/start-lomiri.sh
 Restart=on-failure
 RestartSec=3
-TimeoutStartSec=30
+TimeoutStartSec=120
 
 [Install]
 WantedBy=graphical.target
