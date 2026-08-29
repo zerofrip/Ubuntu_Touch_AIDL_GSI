@@ -464,6 +464,8 @@ if [ -d "$SYSTEMD_DIR" ]; then
             chroot "$TARGET_DIR" systemctl enable "${svc}.service" 2>/dev/null || true
         fi
     done
+    chroot "$TARGET_DIR" systemctl set-default graphical.target 2>/dev/null || true
+    info "systemd default target -> graphical.target (Lomiri WantedBy)"
     chmod 0755 "$TARGET_DIR/usr/lib/ubuntu-gsi/hal-enumerate.sh" 2>/dev/null || true
     chmod 0755 "$TARGET_DIR/usr/lib/ubuntu-gsi/hal-capability-router.sh" 2>/dev/null || true
     chmod 0755 "$TARGET_DIR/usr/lib/ubuntu-gsi/hal-kernel-bringup.sh" 2>/dev/null || true

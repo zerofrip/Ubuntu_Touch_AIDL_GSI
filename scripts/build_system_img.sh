@@ -131,6 +131,34 @@ info "Overlaying Halium scaffolding into $SYS_ROOT"
 mkdir -p "$SYS_ROOT/etc/init"
 install -m 0644 "$HALIUM_DIR/etc/init/ubuntu-gsi.rc" "$SYS_ROOT/etc/init/ubuntu-gsi.rc"
 
+# Default: Lomiri auto-starts after Android boot_completed (opt out: enable=0).
+_prop_files=(
+    "$SYS_ROOT/build.prop"
+    "$SYS_ROOT/etc/prop.default"
+    "$SYS_ROOT/etc/build.prop"
+)
+_baked=0
+for _pf in "${_prop_files[@]}"; do
+    if [ -f "$_pf" ]; then
+        if ! grep -q '^persist\.ubuntu_gsi\.enable=' "$_pf" 2>/dev/null; then
+            printf '\n# Ubuntu GSI: auto-start Lomiri on power-on (set 0 for Android-only)\npersist.ubuntu_gsi.enable=1\n' >> "$_pf"
+            info "Baked persist.ubuntu_gsi.enable=1 into ${_pf#"$SYS_ROOT"/}"
+        else
+            # Force default ON in the image; device persist can still override at runtime.
+            sed -i 's/^persist\.ubuntu_gsi\.enable=.*/persist.ubuntu_gsi.enable=1/' "$_pf"
+            info "Updated persist.ubuntu_gsi.enable=1 in ${_pf#"$SYS_ROOT"/}"
+        fi
+        _baked=1
+        break
+    fi
+done
+if [ "$_baked" -eq 0 ]; then
+    mkdir -p "$SYS_ROOT/etc"
+    printf '# Ubuntu GSI: auto-start Lomiri on power-on\npersist.ubuntu_gsi.enable=1\n' > "$SYS_ROOT/etc/prop.default"
+    info "Created $SYS_ROOT/etc/prop.default with persist.ubuntu_gsi.enable=1"
+fi
+
+
 # Launcher binaries
 mkdir -p "$SYS_ROOT/bin"
 install -m 0755 "$HALIUM_DIR/bin/ubuntu-gsi-launcher"        "$SYS_ROOT/bin/ubuntu-gsi-launcher"
