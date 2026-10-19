@@ -56,6 +56,15 @@ else
     log "WARNING: Could not locate userdata block device — skipping resize"
 fi
 
+# Defense in depth on top of /etc/apt/preferences.d/90-ubuntu-gsi-no-kernel.pref:
+# hold any kernel/initrd/bootloader packages that may already be installed
+# (e.g. pulled in transitively at build time despite the pin), so `apt
+# upgrade` never touches them. This runs once, gated by FIRSTBOOT_MARKER
+# like the rest of Step 0.
+log "Holding kernel/initrd/bootloader packages (defense in depth)"
+# shellcheck disable=SC2046
+apt-mark hold $(dpkg-query -W -f='${Package}\n' 'linux-image-*' 'linux-headers-*' 'initramfs-tools*' 'grub*' 2>/dev/null) >>"$LOG" 2>&1 || true
+
 # ---------------------------------------------------------------------------
 # 1. Create default user
 # ---------------------------------------------------------------------------
