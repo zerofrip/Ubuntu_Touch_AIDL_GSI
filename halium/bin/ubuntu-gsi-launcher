@@ -33,7 +33,7 @@ set -eu
 LOG_TAG="ubuntu-gsi-launcher"
 log() {
     # Send to logcat so journalctl-style debugging works on Android side too.
-    log -t "$LOG_TAG" "$*" 2>/dev/null || true
+    /system/bin/log -t "$LOG_TAG" "$*" 2>/dev/null || true
     echo "[$LOG_TAG] $*" 1>&2
 }
 
@@ -246,6 +246,25 @@ mount --rbind /halium "$OVERLAY_MERGED/halium" || true
 if [ -x /system/bin/ubuntu-gsi-stop-android-ui ]; then
     log "Stopping Android UI services for GPU hand-off"
     /system/bin/ubuntu-gsi-stop-android-ui || log "ui stop returned non-zero (continuing)"
+fi
+
+# Touch controller pre-pivot preparation (F8/MT6897 NVT)
+TOUCH_PREP=/data/local/tmp/ubuntu-gsi-touch-prep.sh
+[ -x "$TOUCH_PREP" ] || TOUCH_PREP=/system/bin/ubuntu-gsi-touch-prep
+[ -x "$TOUCH_PREP" ] || TOUCH_PREP=/system/bin/ubuntu-gsi-touch-prep.sh
+
+if [ -x "$TOUCH_PREP" ]; then
+    if ! "$TOUCH_PREP" pre_pivot "$OVERLAY_MERGED"; then
+        fail 13 "touch prep pre_pivot failed (see /data/local/tmp/touch-prep-fail.log)"
+    fi
+    if ! "$TOUCH_PREP" gpu_prep; then
+        fail 13 "touch prep gpu_prep failed"
+    fi
+    if ! "$TOUCH_PREP" auto_finish; then
+        fail 13 "touch prep auto_finish failed (see /data/local/tmp/touch-prep-fail.log)"
+    fi
+else
+    log "WARN: ubuntu-gsi-touch-prep missing — Mir/NVT patches may be incomplete"
 fi
 
 # -----------------------------------------------------------------------------

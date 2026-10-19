@@ -6,17 +6,41 @@
 # compositor inside the chroot can claim the GPU/DRM/HWC and the audio HAL
 # without resource contention.
 #
-# Vendor HAL services (composer, gralloc, audio, …) are left running because
-# Mir reaches them via libhybris.
+# Gralloc/allocator HALs stay up for libhybris. Vendor hwcomposer must STOP:
+# on MTK AIDL devices a live vendor.hwcomposer-* holds the HWC client slot and
+# Mir android2 times out (~10s) with "QMirServer - Mir failed to start".
 # =============================================================================
 
 set -eu
 
 LOG_TAG="ubuntu-gsi-stop-android-ui"
+# Opt-in debug trace log (formerly debug-63ebe6.log). Set UBUNTU_GSI_DEBUG_TRACE=1 to enable.
+UBUNTU_GSI_DEBUG_TRACE_LOG=${UBUNTU_GSI_DEBUG_TRACE_LOG:-/data/local/tmp/ubuntu-gsi-debug-trace.log}
 log() {
-    log -t "$LOG_TAG" "$*" 2>/dev/null || true
+    /system/bin/log -t "$LOG_TAG" "$*" 2>/dev/null || true
     echo "[$LOG_TAG] $*" 1>&2
 }
+
+# #region agent log
+_nvt_irq_1s() {
+    _a=$(grep NVT-ts /proc/interrupts 2>/dev/null | awk '{print $2}')
+    sleep 1
+    _b=$(grep NVT-ts /proc/interrupts 2>/dev/null | awk '{print $2}')
+    case "$_a" in (''|*[!0-9]*) _a=0 ;; esac
+    case "$_b" in (''|*[!0-9]*) _b=0 ;; esac
+    printf '%s' "$((_b - _a))"
+}
+_dbg_stop() {
+    [ "${UBUNTU_GSI_DEBUG_TRACE:-0}" = "1" ] || return 0
+    _phase=$1
+    _irq=$(_nvt_irq_1s)
+    _ts=$(date +%s%3N 2>/dev/null || date +%s)
+    printf '%s\n' \
+        "{\"sessionId\":\"63ebe6\",\"runId\":\"stop-ui\",\"hypothesisId\":\"H33\",\"location\":\"stop-android-ui:$_phase\",\"message\":\"irq_1s\",\"data\":{\"irq\":$_irq},\"timestamp\":$_ts}" \
+        >>"$UBUNTU_GSI_DEBUG_TRACE_LOG" 2>/dev/null || true
+    log "dbg_nvt phase=$_phase irq_1s=$_irq"
+}
+# #endregion
 
 # Comma-separated list of init-managed services we want stopped.
 ANDROID_UI_SERVICES="
@@ -31,6 +55,16 @@ ANDROID_UI_SERVICES="
     inputflinger
     iorapd
 "
+# H51: keeping vendor hwcomposer avoids NVT panel-suspend → later HWC resume FD storm.
+# Default keep composer; set NVT_STOP_COMPOSER=1 to restore old stop list.
+if [ "${NVT_STOP_COMPOSER:-0}" = "1" ]; then
+    ANDROID_UI_SERVICES="$ANDROID_UI_SERVICES
+    vendor.hwcomposer-3-2
+    vendor.hwcomposer-2-1
+    vendor.hwcomposer-2-3
+    vendor.hwcomposer-2-4
+"
+fi
 
 stop_service() {
     name=$1
@@ -49,6 +83,10 @@ stop_service() {
     esac
 }
 
+# #region agent log
+_dbg_stop "before_stop"
+# #endregion
+
 for s in $ANDROID_UI_SERVICES; do
     stop_service "$s"
 done
@@ -61,6 +99,26 @@ setprop ctl.stop zygote_secondary || true
 # Drop SurfaceFlinger's dm-verity-protected uid 1000 hold on /dev/dri.
 # (Best-effort; ignored if the device isn't using DRM.)
 chmod 0666 /dev/dri/* 2>/dev/null || true
+
+# Android HWC nodes — Mir/libhybris need these after SF stops.
+if [ -d /dev/graphics ]; then
+    chmod 0666 /dev/graphics/* 2>/dev/null || true
+    log "/dev/graphics permissions opened"
+fi
+
+sf_state=$(getprop init.svc.surfaceflinger 2>/dev/null || echo "unknown")
+log "surfaceflinger state after stop: ${sf_state}"
+for _c in vendor.hwcomposer-3-2 vendor.hwcomposer-2-1; do
+    log "$_c state: $(getprop init.svc.$_c 2>/dev/null || echo unknown)"
+done
+# Persist boot breadcrumb for auto-start debugging
+echo "stop-android-ui sf=$sf_state composer3=$(getprop init.svc.vendor.hwcomposer-3-2) ts=$(date 2>/dev/null || echo ?)"     >> /data/uhl_overlay/launcher-boot.log 2>/dev/null || true
+
+# #region agent log
+_dbg_stop "after_stop"
+[ "${UBUNTU_GSI_DEBUG_TRACE:-0}" = "1" ] && sleep 3
+_dbg_stop "after_stop_plus3s"
+# #endregion
 
 log "android UI services stopped"
 exit 0

@@ -32,6 +32,14 @@ on property:sys.boot_completed=1
 # -----------------------------------------------------------------------------
 # 2. Ubuntu chroot launcher (late boot)
 # -----------------------------------------------------------------------------
+# Apply userdata hotfixes before launcher (system.img may lag behind /data).
+service ubuntu-gsi-hotfix-bind /system/bin/sh /system/bin/ubuntu-gsi-hotfix-bind.sh
+    user root
+    group root system
+    seclabel u:r:su:s0
+    oneshot
+    disabled
+
 service ubuntu-gsi-launcher /system/bin/ubuntu-gsi-launcher
     user root
     group root system
@@ -41,11 +49,13 @@ service ubuntu-gsi-launcher /system/bin/ubuntu-gsi-launcher
     stdio_to_kmsg
 
 on property:sys.boot_completed=1 && property:persist.ubuntu_gsi.enable=1
+    start ubuntu-gsi-hotfix-bind
     start ubuntu-gsi-launcher
 
 on property:sys.boot_completed=1 && property:persist.ubuntu_gsi.enable=
     # First boot: enable by default and start.
     setprop persist.ubuntu_gsi.enable 1
+    start ubuntu-gsi-hotfix-bind
     start ubuntu-gsi-launcher
 
 # -----------------------------------------------------------------------------

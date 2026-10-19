@@ -51,7 +51,12 @@ Lomiri → Mir android2 → libhybris HWC/EGL → vendor hwcomposer → kernel D
 Compat stubs (`libui_compat_layer.so`, `libhwc2_compat_layer.so`, `egl_warmup`)
 ship under `/usr/lib/ubuntu-gsi/halium-compat/` inside `system.img` (fallback:
 `/data/local/tmp/halium13-compat`). HWC `.so` selection is by `hwcomposer.*.so`
-glob; optional inproc/patched bind if present in compat dir.
+glob. At build time, set `ENABLE_HWC_INPROC_PATCH=1` to produce a patched
+`hwc_inproc.so` and place it under `/system/usr/lib/ubuntu-gsi/halium-compat/`.
+At runtime the launcher searches for `hwc_inproc.so` in
+`/data/uhl_overlay/halium-compat/`, then `/data/local/tmp/`, then the
+system-shipped path, and bind-mounts the first hit over the vendor hwcomposer.
+The patched library is never written to `/vendor`; it is only bind-mounted.
 
 Lower-layer DRM/GBM experiment: [lower-layer-display.md](lower-layer-display.md).
 

@@ -44,6 +44,7 @@ SYSTEM_IMG_MIN_MB="${SYSTEM_IMG_MIN_MB:-768}"
 SYSTEM_IMG_GROWTH_STEP_MB="${SYSTEM_IMG_GROWTH_STEP_MB:-256}"
 SYSTEM_IMG_MAX_RETRIES="${SYSTEM_IMG_MAX_RETRIES:-4}"
 ROOTFS_SEED_IN_SYSTEM="${ROOTFS_SEED_IN_SYSTEM:-0}"
+ENABLE_HWC_INPROC_PATCH="${ENABLE_HWC_INPROC_PATCH:-0}"
 
 mkdir -p "$OUT_DIR"
 
@@ -135,11 +136,28 @@ install -m 0644 "$HALIUM_DIR/etc/init/ubuntu-gsi.rc" "$STAGING/etc/init/ubuntu-g
 mkdir -p "$STAGING/bin"
 install -m 0755 "$HALIUM_DIR/bin/ubuntu-gsi-launcher"        "$STAGING/bin/ubuntu-gsi-launcher"
 install -m 0755 "$HALIUM_DIR/bin/ubuntu-gsi-stop-android-ui" "$STAGING/bin/ubuntu-gsi-stop-android-ui"
+install -m 0755 "$HALIUM_DIR/bin/ubuntu-gsi-touch-prep.sh"   "$STAGING/bin/ubuntu-gsi-touch-prep.sh"
+install -m 0755 "$HALIUM_DIR/bin/ubuntu-gsi-hotfix-bind.sh"  "$STAGING/bin/ubuntu-gsi-hotfix-bind.sh"
+
+# NVT heal asset (used by touch-prep auto-start)
+mkdir -p "$STAGING/usr/share/ubuntu-gsi"
+if [ -f "$REPO_ROOT/scripts/heal_nvt_touch.sh" ]; then
+    install -m 0755 "$REPO_ROOT/scripts/heal_nvt_touch.sh" \
+        "$STAGING/usr/share/ubuntu-gsi/heal_nvt_touch.sh"
+fi
+install -m 0755 "$HALIUM_DIR/bin/ubuntu-gsi-nvt-keepalive.sh" \
+    "$STAGING/usr/share/ubuntu-gsi/ubuntu-gsi-nvt-keepalive.sh"
 
 # Compat layer (mirrored to /system/usr/lib/ubuntu-gsi/compat)
 mkdir -p "$STAGING/usr/lib/ubuntu-gsi/compat"
 cp -a "$HALIUM_DIR/compat/." "$STAGING/usr/lib/ubuntu-gsi/compat/"
 find "$STAGING/usr/lib/ubuntu-gsi/compat" -type f -name '*.sh' -exec chmod 0755 {} \;
+
+if [ "$ENABLE_HWC_INPROC_PATCH" = "1" ]; then
+    info "Building F8 HWC in-process patch (ENABLE_HWC_INPROC_PATCH=1)"
+    bash "$REPO_ROOT/scripts/build_hwc_inproc_patch.sh" "$STAGING" \
+        || error "HWC inproc patch failed (see message above)"
+fi
 
 # Linux rootfs erofs seed for userdata self-heal (optional for size saving)
 mkdir -p "$STAGING/usr/share/ubuntu-gsi"

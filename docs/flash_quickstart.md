@@ -95,6 +95,33 @@ adb shell setprop persist.ubuntu_gsi.enable 0
 adb reboot
 ```
 
+### Debug trace (optional)
+
+Set `UBUNTU_GSI_DEBUG_TRACE=1` in the environment before starting Android to enable
+opt-in JSON structured logging to `/data/local/tmp/ubuntu-gsi-debug-trace.log`
+(override path with `UBUNTU_GSI_DEBUG_TRACE_LOG`). All NVT touch and HWC diagnostics
+gate behind this flag; it defaults to off. There is no persisted system property for
+this -- it must be exported in the environment of whatever process runs the launcher
+and compat scripts (for example via a `setenv` override in a custom `.rc` fragment,
+or by exporting it before invoking the scripts by hand over `adb shell`).
+
+### F8 (MT6897) HWC in-process patch (build time)
+
+Set `ENABLE_HWC_INPROC_PATCH=1` in `config.env` before running `make build` to build
+and ship a patched `hwc_inproc.so` inside `system.img` at
+`/system/usr/lib/ubuntu-gsi/halium-compat/hwc_inproc.so`.
+
+The patch input is `builder/out/hwc-patches/hwcomposer.mtk_common.patched.so`
+(the PQ-v1-patched binary — **not** the raw stock `.so`). If that file is absent,
+`make build` will print a clear error explaining how to extract it from a connected F8
+first. The search order at runtime is:
+
+1. `/data/uhl_overlay/halium-compat/hwc_inproc.so` (hotfix overlay — highest priority)
+2. `/data/local/tmp/hwc_inproc.so`
+3. `/system/usr/lib/ubuntu-gsi/halium-compat/hwc_inproc.so` (shipped in system.img)
+
+The patched `.so` is only ever bind-mounted at runtime; it is never written to `/vendor`.
+
 ## 5) Recovery path
 
 If Lomiri does not come up, return to Android-only userspace:
