@@ -360,7 +360,7 @@ if [ -d "$SYSTEMD_DIR" ]; then
     cp "$SYSTEMD_DIR"/*.service "$TARGET_DIR/etc/systemd/system/" 2>/dev/null || true
     cp "$SYSTEMD_DIR"/*.timer   "$TARGET_DIR/etc/systemd/system/" 2>/dev/null || true
 
-    for svc in lomiri ubuntu-gsi-firstboot ubuntu-gsi-setup-wizard ubuntu-gsi-compat usb-gadget; do
+    for svc in lomiri ubuntu-gsi-firstboot ubuntu-gsi-setup-wizard ubuntu-gsi-compat usb-gadget ubuntu-gsi-hal-bringup; do
         if [ -f "$TARGET_DIR/etc/systemd/system/${svc}.service" ]; then
             chroot "$TARGET_DIR" systemctl enable "${svc}.service" 2>/dev/null || true
         fi
