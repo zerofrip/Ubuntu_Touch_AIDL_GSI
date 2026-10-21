@@ -82,7 +82,7 @@ start-lomiri.sh  → router (if not already)
 | input | `/dev/input` + udev + Mir evdev | `kernel` |
 | wifi | rfkill + netdev (+ optional vendor power node) | `kernel` |
 | power | sysfs backlight + power_supply | `kernel` |
-| audio | ALSA + Pulse (lazy) | `linux_daemon` / `kernel` |
+| audio | ALSA + Pulse (lazy) — covers mic capture too | `linux_daemon` / `kernel` |
 | bluetooth | BlueZ (lazy) | `linux_daemon` / `kernel` |
 | sensors | IIO + iio-sensor-proxy (lazy) | `linux_daemon` / `kernel` / `aidl_unavailable` |
 | camera | V4L2 + libcamera | `linux_daemon` / `kernel` / `aidl_unavailable` |
@@ -90,6 +90,15 @@ start-lomiri.sh  → router (if not already)
 | telephony | modem nodes + ofono (lazy) | `linux_daemon` / `kernel` / `aidl_unavailable` |
 | fingerprint | device nodes | `kernel` / `aidl_unavailable` |
 | vibrator | timed_output / leds sysfs | `kernel` |
+
+Microphone capture is not a separate subsystem — it rides the existing `audio`
+bridge. Capture uses the same card's `pcmC*D*c` nodes, the same udev rule
+(`75-ubuntu-gsi-hal.rules`, `MODE="0666"`, `GROUP="audio"`), the firstboot
+unmute list (`Capture` / `Internal Mic` / `Headset Mic`), and the same lazily
+started PulseAudio daemon, whose `module-udev-detect` auto-creates capture
+*sources* alongside sinks. Read-only Go/No-Go verification lives in
+`scripts/verify_mic_capture.sh`, which writes
+`builder/out/mic-capture/verify_latest.md`.
 
 ## Runtime status directory
 
