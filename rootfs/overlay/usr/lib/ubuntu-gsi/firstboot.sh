@@ -449,12 +449,27 @@ log "Hall sensor udev rules installed"
 # ---------------------------------------------------------------------------
 log "Configuring WiFi subsystem"
 
+# MediaTek Halium bring-up (wmtWifi '1', rfkill state=1, udev seed)
+if [ -x /usr/lib/ubuntu-gsi/wifi-bringup.sh ]; then
+    /usr/lib/ubuntu-gsi/wifi-bringup.sh || true
+    log "wifi-bringup.sh executed"
+fi
+
 # Unblock WiFi radios (some vendors ship with soft-block)
 if command -v rfkill >/dev/null 2>&1; then
     rfkill unblock wifi 2>/dev/null || true
     rfkill unblock all 2>/dev/null || true
     log "rfkill: unblocked WiFi radios"
 fi
+
+# Kernel ABI: /sys/class/rfkill/*/state — 0=soft-block, 1=unblocked
+for rk in /sys/class/rfkill/rfkill*; do
+    [ -e "$rk/type" ] || continue
+    typ=$(cat "$rk/type" 2>/dev/null || true)
+    if [ "$typ" = "wlan" ] || [ "$typ" = "wifi" ]; then
+        echo 1 > "$rk/state" 2>/dev/null || true
+    fi
+done
 
 # Symlink vendor WiFi firmware into Linux firmware search path
 for fw_dir in \
@@ -489,6 +504,10 @@ fi
 # Configure NetworkManager WiFi backend
 mkdir -p /etc/NetworkManager/conf.d
 cat > /etc/NetworkManager/conf.d/wifi.conf << 'NMWIFI'
+[main]
+dns=default
+rc-manager=file
+
 [device]
 wifi.scan-rand-mac-address=no
 wifi.backend=wpa_supplicant
@@ -496,6 +515,40 @@ wifi.backend=wpa_supplicant
 [connectivity]
 enabled=true
 NMWIFI
+
+# App DNS: Halium has no systemd-resolved — write nameservers to /etc/resolv.conf
+cat > /etc/NetworkManager/conf.d/99-dns-file.conf << 'NMDNS'
+[main]
+dns=default
+rc-manager=file
+NMDNS
+
+if [ ! -f /etc/nsswitch.conf ] || ! grep -qE '^[[:space:]]*hosts:.*dns' /etc/nsswitch.conf 2>/dev/null; then
+    cat > /etc/nsswitch.conf << 'NSS'
+passwd:         files
+group:          files
+shadow:         files
+gshadow:        files
+hosts:          files dns
+networks:       files
+protocols:      db files
+services:       db files
+ethers:         db files
+rpc:            db files
+netgroup:       nis
+NSS
+    log "nsswitch hosts: files dns"
+fi
+if [ -L /etc/resolv.conf ]; then
+    _rt=$(readlink -f /etc/resolv.conf 2>/dev/null || true)
+    case "$_rt" in
+        *stub-resolv*|*systemd*) rm -f /etc/resolv.conf; log "removed stub resolv.conf" ;;
+    esac
+fi
+if [ ! -f /etc/resolv.conf ] || ! grep -qE '^[[:space:]]*nameserver' /etc/resolv.conf 2>/dev/null; then
+    printf 'nameserver 8.8.8.8\nnameserver 1.1.1.1\n' > /etc/resolv.conf
+    log "seeded fallback resolv.conf"
+fi
 
 # Set regulatory domain from vendor if available
 if [ -f /vendor/build.prop ]; then

@@ -1,0 +1,30 @@
+#!/bin/sh
+# Re-apply Halium app routing/DNS when NM brings an interface up or renews DHCP.
+# Android netd may reinstall "from all unreachable" around the same time.
+
+IFACE="$1"
+ACTION="$2"
+
+case "$ACTION" in
+    up|dhcp4-change|dhcp6-change|connectivity-change)
+        ;;
+    *)
+        exit 0
+        ;;
+esac
+
+case "$IFACE" in
+    wlan*|wl*)
+        ;;
+    *)
+        # Still fix policy routing — it is netns-global, not per-iface.
+        ;;
+esac
+
+export WIFI_IFACE="${IFACE:-wlan0}"
+if [ -x /usr/lib/ubuntu-gsi/halium-app-net.sh ]; then
+    /usr/lib/ubuntu-gsi/halium-app-net.sh >/dev/null 2>&1 || true
+elif [ -x /data/uhl_overlay/ubuntu-gsi-bin/halium-app-net.sh ]; then
+    /data/uhl_overlay/ubuntu-gsi-bin/halium-app-net.sh >/dev/null 2>&1 || true
+fi
+exit 0

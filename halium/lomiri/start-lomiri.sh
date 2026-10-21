@@ -73,6 +73,12 @@ if [ -z "$LOMIRI_BIN" ]; then
     exit 2
 fi
 
+# Reclaim DRM from SurfaceFlinger/composer before Lomiri starts (no-op
+# if already reclaimed this boot; failures are non-fatal).
+if [ -x /usr/lib/ubuntu-gsi/hal-gpu-bringup.sh ]; then
+    /usr/lib/ubuntu-gsi/hal-gpu-bringup.sh lomiri_prep || true
+fi
+
 # Make sure the user session bus is available.
 mkdir -p /run/user/32011
 chown 32011:32011 /run/user/32011 2>/dev/null || true
