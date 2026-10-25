@@ -255,5 +255,3 @@ That produces every `android-XX_system.img` plus one shared `userdata.img` and
 - Legacy docs/scripts that mention `linux_rootfs.squashfs`, squashfs **userdata pivot**, or binder bridge daemons are historical. Current `userdata.img` only seeds `/data/ubuntu-gsi/rootfs.erofs`.
 - See `docs/halium-architecture.md` for current behavior.
 
-
-

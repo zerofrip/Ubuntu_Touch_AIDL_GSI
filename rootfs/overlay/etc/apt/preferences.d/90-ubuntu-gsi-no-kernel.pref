@@ -1,0 +1,19 @@
+# Ubuntu GSI (Halium-style chroot pivot): this environment runs entirely on
+# top of the unmodified Android kernel (see ubuntu-gsi-launcher's bind-mount
+# of Android's /system/lib/modules to /lib/modules). There is no /boot
+# partition, no initramfs-tools-managed initrd, and no bootloader for this
+# chroot to manage. Pin these package families to -1 so `apt upgrade` /
+# `apt dist-upgrade` never installs or upgrades them, even via transitive
+# dependencies of Ubuntu-ports metapackages.
+
+Package: linux-image* linux-headers* linux-modules* linux-base linux-firmware
+Pin: release *
+Pin-Priority: -1
+
+Package: initramfs-tools initramfs-tools-core initramfs-tools-bin
+Pin: release *
+Pin-Priority: -1
+
+Package: grub* flash-kernel u-boot* shim-signed shim systemd-boot
+Pin: release *
+Pin-Priority: -1
