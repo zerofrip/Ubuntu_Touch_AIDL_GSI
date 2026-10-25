@@ -105,7 +105,7 @@ stop_android_display_stack() {
                 \[init.svc.*\]:\ \[running\])
                     svc=$(printf '%s' "$line" | sed -n 's/^\[init\.svc\.\([^]]*\)\]:.*/\1/p')
                     case "$svc" in
-                        surfaceflinger|*composer*|*hwcomposer*|*pq_aidl*|*pq@*|*graphics.composer*)
+                        surfaceflinger|*composer*|*pq_aidl*|*pq@*)
                             stop "$svc" 2>/dev/null || true
                             ;;
                     esac
@@ -245,7 +245,7 @@ setenforce 0 2>/dev/null || true
 chmod_drm
 configure_android2
 
-_prep=done
+_prep="done"
 _detail="lomiri_prep"
 
 if drm_is_busy || pidof surfaceflinger >/dev/null 2>&1; then
