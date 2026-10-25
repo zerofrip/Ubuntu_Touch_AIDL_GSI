@@ -105,7 +105,7 @@ stop_android_display_stack() {
                 \[init.svc.*\]:\ \[running\])
                     svc=$(printf '%s' "$line" | sed -n 's/^\[init\.svc\.\([^]]*\)\]:.*/\1/p')
                     case "$svc" in
-                        surfaceflinger|*composer*|*pq_aidl*|*pq@*)
+                        surfaceflinger|*hwcomposer*|*graphics.composer*|*composer*|*pq_aidl*|*pq@*)
                             stop "$svc" 2>/dev/null || true
                             ;;
                     esac
@@ -276,4 +276,3 @@ drm_is_busy && _drm_busy=yes
 write_status "$_prep" "${_detail} sf=${_sf} drm_busy=${_drm_busy}"
 log "mode=lomiri_prep prep=$_prep sf=$_sf drm_busy=$_drm_busy"
 exit 0
-

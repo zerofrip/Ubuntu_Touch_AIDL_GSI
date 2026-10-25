@@ -16,6 +16,9 @@
 
 set -u
 
+# Opt-in debug trace log. Set UBUNTU_GSI_DEBUG_TRACE=1 to enable.
+UBUNTU_GSI_DEBUG_TRACE_LOG=${UBUNTU_GSI_DEBUG_TRACE_LOG:-/data/local/tmp/ubuntu-gsi-debug-trace.log}
+
 # Runtime mode: android | linux | both
 COMPAT_MODE="${1:-${COMPAT_MODE:-both}}"
 case "$COMPAT_MODE" in
@@ -56,6 +59,33 @@ warn() { log "WARN: $*"; }
 exec 9>"$COMPAT_LOCK" 2>/dev/null || true
 if command -v flock >/dev/null 2>&1; then
     flock -n 9 || { log "Another compat-engine instance is running; exiting"; exit 0; }
+fi
+
+# Bind userdata hotfixes before ubuntu-gsi-launcher reads stale system scripts.
+if [ "$COMPAT_MODE" = "android" ] || [ "$COMPAT_MODE" = "both" ]; then
+    _hf=""
+    for _c in /system/bin/ubuntu-gsi-hotfix-bind.sh \
+              /data/uhl_overlay/ubuntu-gsi-bin/ubuntu-gsi-hotfix-bind.sh \
+              /data/local/tmp/ubuntu-gsi-hotfix-bind.sh; do
+        if [ -f "$_c" ]; then
+            _hf="$_c"
+            break
+        fi
+    done
+    if [ -n "$_hf" ]; then
+        chmod 755 "$_hf" 2>/dev/null || true
+        /system/bin/sh "$_hf" 2>/dev/null || true
+        # #region agent log
+        if [ "${UBUNTU_GSI_DEBUG_TRACE:-0}" = "1" ]; then
+            _ts=$(date +%s%3N 2>/dev/null || date +%s)
+            _lb=$(wc -c </system/bin/ubuntu-gsi-launcher 2>/dev/null || echo 0)
+            printf '%s\n' \
+                "{\"sessionId\":\"63ebe6\",\"runId\":\"compat-hotfix\",\"hypothesisId\":\"H2\",\"location\":\"compat-engine:hotfix\",\"message\":\"hotfix from compat\",\"data\":{\"script\":\"$_hf\",\"launcher_bytes\":$_lb},\"timestamp\":$_ts}" \
+                >>"$UBUNTU_GSI_DEBUG_TRACE_LOG" 2>/dev/null || true
+            unset _ts _lb
+        fi
+        # #endregion
+    fi
 fi
 
 # ---------------------------------------------------------------------------

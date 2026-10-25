@@ -26,4 +26,5 @@ adb push "$REPO/builder/out/hal-inventory/service_list_from_inventory.txt" \
   /data/local/tmp/service_list.txt >/dev/null
 bash "$REPO/scripts/probe_aidl_hals.sh"
 bash "$REPO/scripts/verify_lower_layer_display.sh"
-echo "All HAL diagnostics refreshed under builder/out/{hal-inventory,lower-layer-display}/"
+bash "$REPO/scripts/verify_mic_capture.sh"
+echo "All HAL diagnostics refreshed under builder/out/{hal-inventory,lower-layer-display,mic-capture}/"
