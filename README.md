@@ -6,7 +6,7 @@
 
 Ubuntu Touch for Treble devices with **AIDL-era vendor stacks** (Android 12+), redesigned to keep stock boot components untouched.
 
-Build and release images from **vendor-version branches** (`android-12.0` … `android-16.0`). The `main` branch is documentation-only.
+Build and release images from **vendor-version branches** (`android-12.0` … `android-16.0`) and their feature-parity counterparts (`release/halium-gsi-features-android-12.0` … `-16.0`). `main` is the active development trunk — HAL bridge subsystem work, apt-upgrade safety, boot-stabilization fixes, and CI/lint changes land there first and are synced out to the vendor-version branches afterward (`git log --oneline <base>..main` shows what's pending sync at any point).
 
 ## Vendor Branch Strategy
 
