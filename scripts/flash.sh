@@ -96,6 +96,10 @@ if [ "$FLASH_USERDATA" = true ] && [ ! -f "$USERDATA_IMG" ]; then
     [ -f "$USERDATA_IMG" ] || { error "Failed to auto-build userdata.img"; exit 1; }
 fi
 
+if [ "$FLASH_SYSTEM" = true ] && [ -f "$SYSTEM_IMG" ]; then
+    bash "$REPO_ROOT/scripts/verify_system_img.sh" "$SYSTEM_IMG"
+fi
+
 [ "$FLASH_SYSTEM" = true ] && info "system.img          : $(du -h "$SYSTEM_IMG" | cut -f1)"
 [ "$FLASH_VBMETA" = true ] && info "vbmeta-disabled.img : $(du -h "$VBMETA_IMG" | cut -f1)"
 [ "$FLASH_USERDATA" = true ] && info "userdata.img        : $(du -h "$USERDATA_IMG" | cut -f1)"
@@ -242,8 +246,25 @@ read -r CONFIRM
 [ "$CONFIRM" = "FLASH" ] || { info "Cancelled."; exit 0; }
 
 if [ "$FLASH_VBMETA" = true ]; then
-    info "Flashing vbmeta (verity disabled)"
-    fastboot --disable-verity --disable-verification flash vbmeta "$VBMETA_IMG"
+    info "Flashing vbmeta chain (HASHTREE_DISABLED baked into image)"
+    info "NOTE: Do not use --disable-verity; fastboot 34+ rejects valid vbmeta with that flag."
+    slot=$(getvar_value current-slot || true)
+    [ -n "$slot" ] || slot="a"
+    VBMETA_PARTS=(
+        "vbmeta_${slot}"
+        "vbmeta_system_${slot}"
+        "vbmeta_vendor_${slot}"
+    )
+    for part in "${VBMETA_PARTS[@]}"; do
+        part_size=$(getvar_value "partition-size:${part}" || true)
+        if [ -n "$part_size" ] && [ "$part_size" != "0x0" ] && [ "$part_size" != "0" ]; then
+            info "Flashing $part"
+            fastboot flash "$part" "$VBMETA_IMG"
+        else
+            warn "Skipping $part (not reported by bootloader)"
+        fi
+    done
+    warn "MTK devices: if bootloop persists after GSI, try: fastboot erase metadata"
 fi
 
 if [ "$FLASH_SYSTEM" = true ]; then
@@ -264,4 +285,5 @@ fi
 
 success "Flash complete"
 echo "To disable Ubuntu launcher: adb shell setprop persist.ubuntu_gsi.enable 0 && adb reboot"
+
 

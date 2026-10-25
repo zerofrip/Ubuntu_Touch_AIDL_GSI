@@ -82,16 +82,20 @@ bash scripts/flash.sh --userdata-only
 
 ## 4) Runtime toggle
 
-Enable launcher (default is auto-on from init rules):
-
-```bash
-adb shell setprop persist.ubuntu_gsi.enable 1
-```
+Lomiri auto-starts after power-on / `sys.boot_completed` by default
+(`persist.ubuntu_gsi.enable=1` is baked into `system.img`).
 
 Disable launcher (boot Android userspace only):
 
 ```bash
 adb shell setprop persist.ubuntu_gsi.enable 0
+adb reboot
+```
+
+Re-enable auto-start:
+
+```bash
+adb shell setprop persist.ubuntu_gsi.enable 1
 adb reboot
 ```
 
@@ -161,4 +165,3 @@ Check the dry-run output: packages matching `linux-image*`, `linux-headers*`,
 `u-boot*`, `shim*`, or `systemd-boot` must **not** appear in the list of
 packages to be installed or upgraded. If any do appear, the pin file is
 missing or was overridden; do not proceed with the upgrade.
-

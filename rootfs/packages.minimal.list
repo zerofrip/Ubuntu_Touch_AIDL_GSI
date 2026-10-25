@@ -32,15 +32,26 @@ libgles2-mesa
 libwayland-client0
 libwayland-server0
 
-# Core Lomiri stack only
+# Mir / libhybris (Android GPU hand-off)
+libhybris
+libhybris-common1
+libhybris-utils
+libhardware2
+libandroid-properties1
+mir-graphics-drivers-android
+mir-graphics-drivers-android2
+mir-platform-graphics-android15
+mir-platform-graphics-android2-15
+mir-platform-input-evdev7
+qtmir
+
+# Core Lomiri stack only (names that exist on UBports focal)
 lomiri
-lomiri-session
-lomiri-system-compositor
+lomiri-common
 lomiri-keyboard
 lomiri-indicator-network
-lomiri-indicator-power
-lomiri-indicator-sound
 lomiri-system-settings
+lomiri-system-compositor
 
 # Basic tools
 curl
@@ -48,3 +59,4 @@ jq
 nano
 less
 e2fsprogs
+
