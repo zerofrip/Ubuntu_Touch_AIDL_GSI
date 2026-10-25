@@ -54,8 +54,11 @@ ROOTFS_SIZE_MB=$(du -m "$ROOTFS_EROFS" | cut -f1)
 
 # Auto-compute minimal size when USERDATA_SIZE_MB=0
 if [ "${USERDATA_SIZE_MB}" -eq 0 ]; then
-    USERDATA_SIZE_MB=$(( ROOTFS_SIZE_MB * 2 + 96 ))
-    info "Auto userdata size: ${USERDATA_SIZE_MB}MB (rootfs ${ROOTFS_SIZE_MB}MB x2 + 96MB headroom)"
+    # f2fs reserves ~4% of the image for GC/overprovision; a fixed 96MB
+    # headroom runs out once the rootfs nears 1GB and sload.f2fs dies with
+    # "Can't find free block" (exit 255, stdout redirected so it looks silent).
+    USERDATA_SIZE_MB=$(( ROOTFS_SIZE_MB * 2 + 96 + ROOTFS_SIZE_MB / 4 ))
+    info "Auto userdata size: ${USERDATA_SIZE_MB}MB (rootfs ${ROOTFS_SIZE_MB}MB x2 + 96MB + 25% headroom)"
 fi
 
 if [ "$USERDATA_SIZE_MB" -le "$((ROOTFS_SIZE_MB * 2))" ]; then
