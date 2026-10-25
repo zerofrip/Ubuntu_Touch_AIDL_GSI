@@ -77,7 +77,6 @@ OVERLAY_UPPER="/data/uhl_overlay/upper"
 OVERLAY_WORK="/data/uhl_overlay/work"
 OVERLAY_MERGED="/mnt/halium/merged"
 # f2fs cannot host overlay upperdir on many OEM kernels — use ext4 loop instead.
-OVERLAY_EXT4_IMG="/data/ubuntu-gsi/overlay-upper.ext4"
 OVERLAY_EXT4_MNT="/mnt/halium/overlay_rw"
 OVERLAY_EXT4_SIZE_MB="${OVERLAY_EXT4_SIZE_MB:-2048}"
 
@@ -343,9 +342,6 @@ if [ -d /dev/binderfs ] && [ -d "$OVERLAY_MERGED/dev/binderfs" ]; then
         mount --rbind /dev/binderfs "$OVERLAY_MERGED/dev/binderfs" \
             || log "rbind /dev/binderfs failed"
     fi
-    if [ -c "$OVERLAY_MERGED/dev/binderfs/binder" ] && [ -c /dev/binderfs/binder ]; then
-    else
-    fi
 fi
 
 # Expose mount tree inside the chroot for diagnostics (outside /data bind).
@@ -386,6 +382,25 @@ fi
 if [ -x /system/bin/ubuntu-gsi-stop-android-ui ]; then
     log "Stopping Android UI services for GPU hand-off"
     /system/bin/ubuntu-gsi-stop-android-ui || log "ui stop returned non-zero (continuing)"
+fi
+
+# Touch controller pre-pivot preparation (F8/MT6897 NVT)
+TOUCH_PREP=/data/local/tmp/ubuntu-gsi-touch-prep.sh
+[ -x "$TOUCH_PREP" ] || TOUCH_PREP=/system/bin/ubuntu-gsi-touch-prep
+[ -x "$TOUCH_PREP" ] || TOUCH_PREP=/system/bin/ubuntu-gsi-touch-prep.sh
+
+if [ -x "$TOUCH_PREP" ]; then
+    if ! "$TOUCH_PREP" pre_pivot "$OVERLAY_MERGED"; then
+        fail 13 "touch prep pre_pivot failed (see /data/local/tmp/touch-prep-fail.log)"
+    fi
+    if ! "$TOUCH_PREP" gpu_prep; then
+        fail 13 "touch prep gpu_prep failed"
+    fi
+    if ! "$TOUCH_PREP" auto_finish; then
+        fail 13 "touch prep auto_finish failed (see /data/local/tmp/touch-prep-fail.log)"
+    fi
+else
+    log "WARN: ubuntu-gsi-touch-prep missing — Mir/NVT patches may be incomplete"
 fi
 
 # -----------------------------------------------------------------------------
