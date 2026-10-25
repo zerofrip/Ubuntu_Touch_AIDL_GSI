@@ -31,6 +31,14 @@ on property:vendor.early.boot=1
 # -----------------------------------------------------------------------------
 # 2. Ubuntu chroot launcher (late boot)
 # -----------------------------------------------------------------------------
+# Apply userdata hotfixes before launcher (system.img may lag behind /data).
+service ubuntu-gsi-hotfix-bind /system/bin/sh /system/bin/ubuntu-gsi-hotfix-bind.sh
+    user root
+    group root system
+    seclabel u:r:su:s0
+    oneshot
+    disabled
+
 # Exec via labeled /system/bin/sh. Overlay files packed with mkfs.ext4 -d
 # are unlabeled; init (permissive=0) cannot execute unlabeled binaries.
 service ubuntu-gsi-launcher /system/bin/sh /system/bin/ubuntu-gsi-launcher
@@ -46,6 +54,7 @@ service ubuntu-gsi-launcher /system/bin/sh /system/bin/ubuntu-gsi-launcher
 on property:sys.boot_completed=1
     # Re-run compat for any actions that depend on framework being up.
     start ubuntu-gsi-compat-android
+    start ubuntu-gsi-hotfix-bind
     start ubuntu-gsi-launcher
 
 # -----------------------------------------------------------------------------

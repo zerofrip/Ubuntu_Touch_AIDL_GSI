@@ -235,6 +235,22 @@ rm -f "$TARGET_DIR/etc/apt/trusted.gpg.d/ubports-signing.gpg" 2>/dev/null || tru
 success "apt sources configured (Ubuntu + UBports)"
 echo ""
 
+info "Phase 2b — Installing apt safety overrides (kernel/initrd/bootloader pin)"
+REPO_ROOT_OVERLAY="$REPO_ROOT/rootfs/overlay"
+mkdir -p "$TARGET_DIR/etc/apt/preferences.d" "$TARGET_DIR/etc/apt/apt.conf.d" "$TARGET_DIR/etc/needrestart/conf.d"
+for rel in \
+    etc/apt/preferences.d/90-ubuntu-gsi-no-kernel.pref \
+    etc/apt/apt.conf.d/90-ubuntu-gsi-noninteractive.conf \
+    etc/needrestart/conf.d/90-ubuntu-gsi.conf; do
+    if [ -f "$REPO_ROOT_OVERLAY/$rel" ]; then
+        cp "$REPO_ROOT_OVERLAY/$rel" "$TARGET_DIR/$rel"
+    else
+        error "Missing overlay source for $rel"
+    fi
+done
+success "apt safety overrides installed"
+echo ""
+
 info "Phase 3 — Installing packages"
 if [ -n "$CI_MINIMAL_PACKAGES" ]; then
     PACKAGES="systemd systemd-sysv dbus udev sudo bash bash-completion locales ca-certificates network-manager iproute2 openssh-server"
@@ -587,6 +603,16 @@ EOF3
 echo "$ROOTFS_PROFILE" > "$ROOTFS_PROFILE_FILE"
 
 success "Fingerprint written to /etc/ubuntu-gsi-release"
+echo ""
+
+info "Phase 7.5 — Verifying apt safety overrides"
+if [ -f "$TARGET_DIR/etc/apt/preferences.d/90-ubuntu-gsi-no-kernel.pref" ]; then
+    success "apt kernel/initrd/bootloader pin present"
+else
+    error "Missing $TARGET_DIR/etc/apt/preferences.d/90-ubuntu-gsi-no-kernel.pref"
+    error "apt upgrade would be unsafe (could pull in linux-image/initramfs-tools/grub packages)"
+    exit 1
+fi
 echo ""
 echo -e "${BOLD}═══════════════════════════════════════════════════════════════${NC}"
 echo -e "${GREEN}${BOLD}  ✔  Rootfs build complete: $TARGET_DIR${NC}"
