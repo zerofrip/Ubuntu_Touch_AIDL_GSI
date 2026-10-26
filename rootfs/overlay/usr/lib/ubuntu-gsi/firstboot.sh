@@ -413,8 +413,8 @@ if [ -e /sys/class/timed_output/vibrator/enable ]; then
     log "timed_output vibrator permissions set"
 fi
 
-# LED-class vibrator
-for led in /sys/class/leds/vibrator /sys/class/leds/vibrator_0; do
+# LED-class vibrator (any vibrator* name — device-agnostic)
+for led in /sys/class/leds/vibrator*; do
     if [ -d "$led" ]; then
         chmod 0666 "$led/brightness" 2>/dev/null || true
         chmod 0666 "$led/activate" 2>/dev/null || true
@@ -455,13 +455,26 @@ if [ -x /usr/lib/ubuntu-gsi/wifi-bringup.sh ]; then
     log "wifi-bringup.sh executed"
 fi
 
+# Phase 1 HAL bring-up (permissions + daemons) every first boot path
+if [ -x /usr/lib/ubuntu-gsi/hal-kernel-bringup.sh ]; then
+    /usr/lib/ubuntu-gsi/hal-kernel-bringup.sh || true
+    log "hal-kernel-bringup.sh executed"
+fi
+if [ -x /usr/lib/ubuntu-gsi/hal-aidl-probe.sh ]; then
+    /usr/lib/ubuntu-gsi/hal-aidl-probe.sh || true
+    log "hal-aidl-probe.sh executed"
+fi
+if systemctl list-unit-files ubuntu-gsi-hal-bringup.service >/dev/null 2>&1; then
+    systemctl enable ubuntu-gsi-hal-bringup.service 2>/dev/null || true
+    log "ubuntu-gsi-hal-bringup.service enabled"
+fi
+
 # Unblock WiFi radios (some vendors ship with soft-block)
 if command -v rfkill >/dev/null 2>&1; then
     rfkill unblock wifi 2>/dev/null || true
     rfkill unblock all 2>/dev/null || true
     log "rfkill: unblocked WiFi radios"
 fi
-
 # Kernel ABI: /sys/class/rfkill/*/state — 0=soft-block, 1=unblocked
 for rk in /sys/class/rfkill/rfkill*; do
     [ -e "$rk/type" ] || continue
@@ -871,9 +884,9 @@ log "Configuring biometric authentication"
 # -- Fingerprint --
 FP_DETECTED=0
 
-# Detect fingerprint device (sysfs, /dev, vendor init.rc)
-for fp_dev in /dev/fingerprint* /dev/goodix_fp /dev/fpc1020 /dev/silead_fp \
-              /dev/elan_fp /dev/cdfinger /dev/sunwave_fp; do
+# Detect fingerprint device (generic globs first, then known vendor nodes)
+for fp_dev in /dev/fingerprint* /dev/fpsensor* /dev/*_fp /dev/goodix* \
+              /dev/fpc* /dev/silead* /dev/elan_fp /dev/cdfinger /dev/sunwave_fp; do
     if [ -c "$fp_dev" ] || [ -e "$fp_dev" ]; then
         chmod 0660 "$fp_dev" 2>/dev/null || true
         chgrp input "$fp_dev" 2>/dev/null || true
@@ -896,14 +909,14 @@ fi
 
 # Udev rule for fingerprint devices
 cat > /etc/udev/rules.d/80-fingerprint.rules <<'FPEOF'
-# Fingerprint reader devices
+# Fingerprint reader devices (generic patterns — works across OEMs)
 KERNEL=="fingerprint*", MODE="0660", GROUP="input"
-KERNEL=="goodix_fp", MODE="0660", GROUP="input"
-KERNEL=="fpc1020", MODE="0660", GROUP="input"
-KERNEL=="silead_fp", MODE="0660", GROUP="input"
-KERNEL=="elan_fp", MODE="0660", GROUP="input"
-KERNEL=="cdfinger", MODE="0660", GROUP="input"
-KERNEL=="sunwave_fp", MODE="0660", GROUP="input"
+KERNEL=="fpsensor*", MODE="0660", GROUP="input"
+KERNEL=="*_fp", MODE="0660", GROUP="input"
+KERNEL=="goodix*", MODE="0660", GROUP="input"
+KERNEL=="fpc*", MODE="0660", GROUP="input"
+KERNEL=="silead*", MODE="0660", GROUP="input"
+KERNEL=="cdfinger*", MODE="0660", GROUP="input"
 FPEOF
 
 if command -v fprintd >/dev/null 2>&1; then
@@ -1215,6 +1228,7 @@ if [ ! -f "$CLICK_MARKER" ]; then
         if command -v pkcon >/dev/null 2>&1; then
             pkcon install-local --allow-untrusted "$c" >>"$LOG" 2>&1 || true
         elif command -v click >/dev/null 2>&1; then
+            # Halium: frameworks may be incomplete; force + register for ubuntu.
             click install --force-missing-framework --allow-unauthenticated --user=ubuntu "$c" >>"$LOG" 2>&1 \
                 || click install --force-missing-framework --allow-unauthenticated --all-users "$c" >>"$LOG" 2>&1 || true
         else
@@ -1254,6 +1268,7 @@ if [ ! -f "$DRAWER_MARKER" ] && id -u ubuntu >/dev/null 2>&1; then
             fi
         done < "$MANIFEST"
     else
+        # Fallback: any system desktop that launches a preinstalled click.
         for src in /usr/share/applications/*.desktop; do
             [ -f "$src" ] || continue
             if grep -q '/opt/click.ubuntu.com/' "$src" 2>/dev/null; then
@@ -1262,6 +1277,7 @@ if [ ! -f "$DRAWER_MARKER" ] && id -u ubuntu >/dev/null 2>&1; then
             fi
         done
     fi
+    # OpenStore apt client shortcut (if present).
     if [ -f /usr/share/applications/openstore-client.desktop ]; then
         cp -a /usr/share/applications/openstore-client.desktop \
             "$USER_APPS/openstore-client.desktop"
@@ -1336,3 +1352,4 @@ log "═════════════════════════
 log "  First boot complete!"
 log "  GUI Setup Wizard will launch after Lomiri starts."
 log "═══════════════════════════════════════════════════"
+

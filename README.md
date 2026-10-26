@@ -159,16 +159,19 @@ Full flash guide: `docs/flash_quickstart.md`.
 
 ## Runtime Control
 
-Enable Ubuntu launcher (default is auto-on from init rules):
-
-```bash
-adb shell setprop persist.ubuntu_gsi.enable 1
-```
+Lomiri starts automatically after power-on (default `persist.ubuntu_gsi.enable=1`).
 
 Disable launcher and boot Android-only userspace:
 
 ```bash
 adb shell setprop persist.ubuntu_gsi.enable 0
+adb reboot
+```
+
+Re-enable:
+
+```bash
+adb shell setprop persist.ubuntu_gsi.enable 1
 adb reboot
 ```
 
@@ -259,5 +262,4 @@ That produces every `android-XX_system.img` plus one shared `userdata.img` and
 
 - Legacy docs/scripts that mention `linux_rootfs.squashfs`, squashfs **userdata pivot**, or binder bridge daemons are historical. Current `userdata.img` only seeds `/data/ubuntu-gsi/rootfs.erofs`.
 - See `docs/halium-architecture.md` for current behavior.
-
 

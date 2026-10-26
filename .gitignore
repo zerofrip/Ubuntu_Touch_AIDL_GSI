@@ -28,3 +28,20 @@ builder/out/userdata_staging/
 *.log
 MASTER_QA_REPORT.*
 
+# Builder cache / logs (not source)
+builder/cache/
+builder/logs/
+
+# Device dumps and accidental extractions at repo root
+/*.so
+/dmesg.txt
+/logcat.txt
+/last_kmsg.txt
+/recovery_logcat.txt
+
+# Accidental local tooling (Frida etc.)
+node_modules/
+package.json
+package-lock.json
+
+
