@@ -6,7 +6,7 @@
 
 Ubuntu Touch for Treble devices with **AIDL-era vendor stacks** (Android 12+), redesigned to keep stock boot components untouched.
 
-Build and release images from **vendor-version branches** (`android-12.0` … `android-16.0`). The `main` branch is documentation-only.
+Build and release images from **vendor-version branches** (`android-12.0` … `android-16.0`) and their feature-parity counterparts (`release/halium-gsi-features-android-12.0` … `-16.0`). `main` is the active development trunk — HAL bridge subsystem work, apt-upgrade safety, boot-stabilization fixes, and CI/lint changes land there first and are synced out to the vendor-version branches afterward (`git log --oneline <base>..main` shows what's pending sync at any point).
 
 ## Vendor Branch Strategy
 
@@ -27,9 +27,9 @@ TrebleDroid references: [treble_experimentations releases](https://github.com/Tr
 - Keep **stock `boot.img`** untouched.
 - Keep **stock kernel** untouched.
 - Flash only:
-  - `android-XX_system.img` (versioned system image)
+  - `android-XX_system.img` (versioned system image; embeds the rootfs seed)
   - `vbmeta-disabled.img`
-  - `userdata.img` (seeds `/data/ubuntu-gsi/rootfs.erofs`)
+  - `userdata.img` (optional seed for `/data/ubuntu-gsi/rootfs.erofs`; not flashed by default)
 - Do not flash `boot`, `vendor_boot`, `dtbo`, or `vendor`.
 
 ## Current Architecture (Halium-style)
@@ -60,7 +60,7 @@ Authoritative design doc: `docs/halium-architecture.md`
   - `build_system_img.sh` PHH base + Halium overlay merge
   - `build_userdata_img.sh` userdata seed (`/data/ubuntu-gsi/rootfs.erofs`)
   - `fetch_openstore_clicks.sh` Core Apps click download (`rootfs/clicks.core-apps.list`)
-  - `flash.sh` flashes `system + vbmeta + userdata` (selective flags available)
+  - `flash.sh` flashes `system + vbmeta` by default (userdata opt-in; selective flags available)
 - `rootfs/overlay/usr/lib/ubuntu-gsi/`
   - WiFi reclaim / app DNS+routing (`wifi-bringup.sh`, `halium-app-net.sh`)
   - HAL / display bring-up helpers
@@ -124,7 +124,6 @@ fastboot flash vbmeta_system_a builder/out/vbmeta-disabled.img
 fastboot flash vbmeta_vendor_a builder/out/vbmeta-disabled.img
 fastboot reboot fastboot
 fastboot flash system_a builder/out/android-16.0_system.img
-fastboot flash userdata builder/out/userdata.img
 fastboot reboot
 ```
 
@@ -140,13 +139,20 @@ standalone `vbmeta*.img` files. On fastboot 34+, that flag path fails with
 `Failed to find AVB_MAGIC at offset: 0`. Verity is disabled by baking `flags=3`
 into `vbmeta-disabled.img` at build time.
 
-`make flash` includes **userdata** (wipes `/data`). Use that on first install.
-For everyday system updates that keep existing `/data/ubuntu-gsi`, skip userdata:
+`make flash` flashes **system + vbmeta-disabled only**. `userdata` is skipped because
+the first boot self-seeds `/data/ubuntu-gsi/rootfs.erofs` from the rootfs embedded in
+`system.img`. The same applies to everyday updates that keep existing `/data/ubuntu-gsi`:
 
 ```bash
 make flash-system
 make flash-vbmeta
-bash scripts/flash.sh --no-userdata
+```
+
+Flashing userdata is opt-in (it **wipes `/data`**, and on MediaTek devices the next
+boot shows stock recovery's "erase data" confirmation prompt):
+
+```bash
+bash scripts/flash.sh --with-userdata
 ```
 
 Full flash guide: `docs/flash_quickstart.md`.
@@ -232,7 +238,9 @@ Rootfs persistence/self-heal:
 - Backup copy is kept at `/data/ubuntu-gsi/rootfs.erofs.bak`
 - SHA-256 is verified at boot; missing/corrupt data copy is auto-restored
 - Restore source is system seed `/system/usr/share/ubuntu-gsi/rootfs.erofs`
-- `ROOTFS_SEED_IN_SYSTEM=0` keeps `system.img` smaller, but removes reset-time seed restore
+- `ROOTFS_SEED_IN_SYSTEM=1` (default) embeds the seed in `system.img` so first boot
+  self-heals `/data/ubuntu-gsi/rootfs.erofs`; `=0` keeps `system.img` smaller but
+  removes the in-system seed source, making `userdata.img` the only provisioning path
 
 
 ## CI multi-version (`main`)
