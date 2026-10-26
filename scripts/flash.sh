@@ -1,15 +1,16 @@
 #!/bin/bash
 # =============================================================================
-# scripts/flash.sh — Halium-style flasher (system + vbmeta + userdata)
+# scripts/flash.sh — Halium-style flasher (system + vbmeta; userdata opt-in)
 # =============================================================================
 # Never flashes boot.img or kernel-related partitions.
 #
 # Usage:
-#   bash scripts/flash.sh                 # flash system + vbmeta-disabled + userdata
-#   bash scripts/flash.sh --system-only   # flash system only
-#   bash scripts/flash.sh --vbmeta-only   # flash vbmeta-disabled only
-#   bash scripts/flash.sh --userdata-only # flash userdata only
-#   bash scripts/flash.sh --no-userdata   # skip userdata in default mode
+#   bash scripts/flash.sh                  # flash system + vbmeta-disabled (no userdata; first boot self-seeds from system image)
+#   bash scripts/flash.sh --with-userdata  # also flash userdata.img (wipes /data; MTK: stock recovery "erase data" prompt)
+#   bash scripts/flash.sh --system-only    # flash system only
+#   bash scripts/flash.sh --vbmeta-only    # flash vbmeta-disabled only
+#   bash scripts/flash.sh --userdata-only  # flash userdata only
+#   bash scripts/flash.sh --no-userdata    # skip userdata (default; accepted for compatibility)
 # =============================================================================
 
 set -euo pipefail
@@ -19,7 +20,9 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 BUILD_DIR="$REPO_ROOT/builder/out"
 
 CONFIG_FILE="$REPO_ROOT/config.env"
-if [ -f "$CONFIG_FILE" ]; then
+# --help/-h must work on any branch, including main, where config.env's
+# vendor-config loader errors out without VENDOR_ANDROID_VERSION set.
+if [ "${1:-}" != "--help" ] && [ "${1:-}" != "-h" ] && [ -f "$CONFIG_FILE" ]; then
     # shellcheck source=/dev/null
     source "$CONFIG_FILE"
 fi
@@ -45,22 +48,25 @@ error()   { echo -e "${RED}[Flash]${NC}  $1"; }
 
 FLASH_SYSTEM=true
 FLASH_VBMETA=true
-FLASH_USERDATA=true
+FLASH_USERDATA=false
 
 case "${1:-}" in
     --system-only) FLASH_VBMETA=false; FLASH_USERDATA=false ;;
     --vbmeta-only) FLASH_SYSTEM=false; FLASH_USERDATA=false ;;
-    --userdata-only) FLASH_SYSTEM=false; FLASH_VBMETA=false ;;
+    --userdata-only) FLASH_SYSTEM=false; FLASH_VBMETA=false; FLASH_USERDATA=true ;;
+    --with-userdata) FLASH_USERDATA=true ;;
     --no-userdata) FLASH_USERDATA=false ;;
     --help|-h)
         cat <<USAGE
-Usage: $0 [--system-only | --vbmeta-only | --userdata-only | --no-userdata]
+Usage: $0 [--system-only | --vbmeta-only | --userdata-only | --with-userdata | --no-userdata]
 
-  default         Flash system + vbmeta-disabled + userdata
+  default         Flash system + vbmeta-disabled (no userdata; first boot self-seeds from system image)
   --system-only   Flash system only
   --vbmeta-only   Flash vbmeta-disabled only
-  --userdata-only Flash userdata only
-  --no-userdata   Skip userdata flash in default mode
+  --userdata-only Flash userdata only (wipes /data)
+  --with-userdata Also flash userdata.img (wipes /data; on MediaTek devices stock
+                  recovery shows an "erase data" confirmation prompt on next boot)
+  --no-userdata   Skip userdata (default; accepted for compatibility)
 
 This script NEVER flashes: boot, vendor_boot, dtbo, vendor.
 USAGE
