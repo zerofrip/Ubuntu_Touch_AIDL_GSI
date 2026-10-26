@@ -8,7 +8,9 @@ Hard constraints:
 - keep **stock `boot.img`**
 - keep **stock kernel**
 - do **not** flash `boot`, `vendor_boot`, `dtbo`, or `vendor`
-- flash **`system.img` + disabled `vbmeta`**; flash **`userdata.img` on first install** to seed `/data/ubuntu-gsi/rootfs.erofs`
+- flash **`system.img` + disabled `vbmeta`**; `userdata.img` is opt-in
+  (`flash.sh --with-userdata`) — first boot self-seeds
+  `/data/ubuntu-gsi/rootfs.erofs` from the in-system seed
 
 For the complete authoritative design, read:
 
@@ -48,20 +50,28 @@ These are historical and live under `deprecated/`:
 
 ## Flash flow (current)
 
-First install (or when reseeding `/data`):
+First install (and everyday system/vbmeta updates) — no userdata flash:
 
 ```bash
 make flash
 # equivalent: bash scripts/flash.sh
 ```
 
+First boot self-seeds `/data/ubuntu-gsi/rootfs.erofs` from
+`/system/usr/share/ubuntu-gsi/rootfs.erofs`.
+
 System-only update (keep existing `/data`):
 
 ```bash
 make flash-system
-# or: bash scripts/flash.sh --no-userdata
+```
+
+Opt-in userdata refresh (**wipes `/data`**):
+
+```bash
+bash scripts/flash.sh --with-userdata
 ```
 
 `boot`, `vendor_boot`, `dtbo`, and `vendor` stay untouched. Skipping userdata
-is safe only when `/data/ubuntu-gsi/rootfs.erofs` (or a system seed heal path)
-already exists.
+is safe because `/data/ubuntu-gsi/rootfs.erofs` is re-seeded from the system
+seed on the next boot when missing or corrupt.
