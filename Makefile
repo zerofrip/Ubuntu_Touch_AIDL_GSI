@@ -59,7 +59,7 @@ userdata: ## Build userdata.img containing rootfs.erofs A/B seed
 release: ## Package versioned release artifacts (android-XX_system.img)
 	@bash scripts/package_release_artifacts.sh
 
-flash: ## Flash system + vbmeta-disabled + userdata (with size checks)
+flash: ## Flash system + vbmeta-disabled (with size checks; userdata opt-in via flash.sh --with-userdata)
 	@bash scripts/flash.sh
 
 flash-system: ## Flash system only
