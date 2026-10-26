@@ -1,7 +1,8 @@
 # Flash Quickstart (Halium-style, AIDL)
 
-Keep stock `boot.img` and stock kernel unchanged. Flash only `system`, disabled
-`vbmeta*`, and (on first install) `userdata`.
+Keep stock `boot.img` and stock kernel unchanged. Flash only `system` and disabled
+`vbmeta*`. On first boot the launcher self-seeds `/data/ubuntu-gsi/rootfs.erofs`
+from the rootfs bundled inside `system.img`.
 
 ## 1) Build
 
@@ -15,7 +16,7 @@ Expected artifacts in `builder/out/`:
 
 - `android-XX_system.img` (e.g. `android-16.0_system.img`; `system.img` symlink may exist)
 - `vbmeta-disabled.img`
-- `userdata.img` (seeds `/data/ubuntu-gsi/rootfs.erofs` + overlay dirs)
+- `userdata.img` (optional seed for `/data/ubuntu-gsi/rootfs.erofs` + overlay dirs; not flashed by default)
 - `linux_rootfs.erofs` (intermediate)
 
 GitHub Releases attach `android-XX_system.img.xz` (compressed). Decompress before
@@ -36,8 +37,9 @@ or use hardware keys.
 make flash
 ```
 
-This runs `scripts/flash.sh` and flashes **system + vbmeta-disabled + userdata**
-by default (with size checks).
+This runs `scripts/flash.sh` and flashes **system + vbmeta-disabled only**
+(with size checks). `userdata` is skipped: first boot self-seeds
+`/data/ubuntu-gsi/rootfs.erofs` from the rootfs embedded in `system.img`.
 
 ### Manual flash (A/B example)
 
@@ -50,7 +52,6 @@ fastboot flash vbmeta_system_a builder/out/vbmeta-disabled.img
 fastboot flash vbmeta_vendor_a builder/out/vbmeta-disabled.img
 fastboot reboot fastboot
 fastboot flash system_a builder/out/android-16.0_system.img
-fastboot flash userdata builder/out/userdata.img
 fastboot reboot
 ```
 
@@ -61,24 +62,44 @@ standalone `vbmeta*.img` files. On fastboot 34+, that path fails with
 
 Do **not** flash `boot`, `vendor_boot`, `dtbo`, or `vendor`.
 
-### When to flash userdata
+### When userdata is (not) flashed
 
 | Situation | userdata |
 |-----------|----------|
-| First install / factory reset / empty `/data` | **Flash** (`make flash` or `--userdata-only`) |
-| Refresh rootfs seed + wipe `/data` | **Flash** |
-| Everyday system (and/or vbmeta) update with existing `/data/ubuntu-gsi` | **Skip** (`make flash-system` or `bash scripts/flash.sh --no-userdata`) |
-
-Flashing `userdata` wipes Android `/data` (apps, Wi‑Fi, settings).
+| First install / factory reset / empty `/data` | **Skip** — first boot self-seeds from `system.img` |
+| Everyday system (and/or vbmeta) update with existing `/data/ubuntu-gsi` | **Skip** |
+| Corrupted `/data/ubuntu-gsi` you want to rebuild without self-heal | Optional (`--with-userdata`) |
+| Build with `ROOTFS_SEED_IN_SYSTEM=0` (smaller `system.img`) | Required (`--with-userdata`) |
 
 Selective targets:
 
 ```bash
 make flash-system
 make flash-vbmeta
-bash scripts/flash.sh --no-userdata
+bash scripts/flash.sh --with-userdata
+bash scripts/flash.sh --no-userdata        # default; kept for compatibility
 bash scripts/flash.sh --userdata-only
 ```
+
+### Escape hatch: flashing userdata (opt-in)
+
+`userdata.img` is no longer part of the default flow. It is still built and can be
+flashed when you want to force a fresh `/data/ubuntu-gsi` seed without waiting for
+self-heal, or when the build was made with `ROOTFS_SEED_IN_SYSTEM=0` (no in-system
+seed — `userdata.img` is then the only provisioning path).
+
+```bash
+make userdata                              # build it if not present
+bash scripts/flash.sh --with-userdata      # system + vbmeta + userdata
+bash scripts/flash.sh --userdata-only      # userdata only
+```
+
+Flashing `userdata` **wipes Android `/data`** (apps, Wi-Fi, settings).
+
+On MediaTek devices, fastboot-flashing `userdata` makes stock recovery show an
+"erase data" confirmation prompt on the next boot. This is a preloader/recovery
+security gate independent of the image content, so no `userdata.img` format change
+avoids it — accept the prompt to continue.
 
 ## 4) Runtime toggle
 
@@ -136,7 +157,8 @@ adb reboot
 ```
 
 If the system partition is broken, reflash stock system from the OEM package,
-then re-apply this project's `system` + `vbmeta` (and `userdata` if `/data` was wiped).
+then re-apply this project's `system` + `vbmeta` (and `userdata` only if `/data`
+was wiped and you opted out of the in-system seed).
 
 See also: `docs/halium-architecture.md`, `docs/lower-layer-display.md`.
 

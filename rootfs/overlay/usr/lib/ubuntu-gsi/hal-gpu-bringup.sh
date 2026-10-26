@@ -105,7 +105,7 @@ stop_android_display_stack() {
                 \[init.svc.*\]:\ \[running\])
                     svc=$(printf '%s' "$line" | sed -n 's/^\[init\.svc\.\([^]]*\)\]:.*/\1/p')
                     case "$svc" in
-                        surfaceflinger|*hwcomposer*|*graphics.composer*|*composer*|*pq_aidl*|*pq@*)
+                        surfaceflinger|*composer*|*pq_aidl*|*pq@*)
                             stop "$svc" 2>/dev/null || true
                             ;;
                     esac
@@ -262,7 +262,7 @@ fi
 if apply_optional_hwc_patch; then
     :
 else
-    _prep="partial"
+    _prep=partial
     _detail="${_detail} hwc_patch_failed"
 fi
 

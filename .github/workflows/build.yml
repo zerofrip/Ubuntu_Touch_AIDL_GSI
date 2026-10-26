@@ -337,7 +337,7 @@ jobs:
             | File | Description |
             |------|-------------|
             | `android-XX_system.img.xz` | Per-vendor system image (compressed; decompress before flash) |
-            | `userdata.img` | Shared seed for `/data/ubuntu-gsi/rootfs.erofs` (not vendor-specific) |
+            | `userdata.img` | Shared seed for `/data/ubuntu-gsi/rootfs.erofs` (optional; not flashed by default) |
             | `vbmeta-disabled.img` | Shared disabled vbmeta (`flags=3`; not vendor-specific) |
 
             Note: Assets larger than 2GB after compression are skipped.
@@ -351,9 +351,11 @@ jobs:
             fastboot flash vbmeta_vendor_a vbmeta-disabled.img
             fastboot reboot fastboot
             fastboot flash system_a android-16.0_system.img
-            fastboot flash userdata userdata.img
             fastboot reboot
             ```
+            `system.img` embeds the rootfs seed, so first boot provisions
+            `/data/ubuntu-gsi/rootfs.erofs` — no userdata flash needed.
+            `userdata.img` is opt-in (`bash scripts/flash.sh --with-userdata`) and wipes `/data`.
 
             Do **not** pass `--disable-verity` / `--disable-verification` when flashing
             standalone `vbmeta*.img` (fastboot 34+). Verity is disabled via baked-in `flags=3`.
